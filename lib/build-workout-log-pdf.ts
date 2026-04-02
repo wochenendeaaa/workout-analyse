@@ -6,69 +6,52 @@ const A4 = { w: 595.28, h: 841.89 };
 const MARGIN = 42;
 const FOOTER_BOTTOM = 22;
 const CONTENT_BOTTOM_RESERVE = FOOTER_BOTTOM + 14;
+/** Vertikaler Akzent links an Übungs-/Sektionsblöcken */
+const ACCENT_BAR_W = 3.5;
 
-const TABLE_FONT = 9.5;
-const HEADER_FONT = 10;
-const RATIONALE_FONT = 7.8;
-const PLACEHOLDER_FONT = 7.5;
-const PLACEHOLDER_LABEL = "eintragen";
-const TITLE = 18;
-const SUB = 10;
-const HEADER_ROW_H = 30;
-const MIN_ROW_H = 56;
-const LINE_H = 11.8;
-const LINE_H_SMALL = 9.2;
-const NAME_MAX_LINES = 2;
-const RATIONALE_MAX_LINES = 3;
-const TARGET_MAX_LINES = 5;
+const LABEL = 7;
+const BRAND = 9;
+const BRAND_SUB = 8;
+const META = 10;
+const EX_NAME = 11.5;
+const EX_TARGET = 10;
+const EX_BADGE = 6.5;
+const CELL_LABEL = 7;
+const CELL_LINE = 9;
+const SECTION = 11.5;
+const BULLET = 9.5;
+const TIP = 9;
+const FOOT = 9;
 
-const COLS = {
-  exercise: 121,
-  target: 121,
-  s1: 37,
-  s2: 37,
-  s3: 37,
-  s4: 37,
-  notes: 121,
-} as const;
+const EX_NAME_LINE = 14;
+const EX_TARGET_H = 14;
+const EX_BLOCK_PAD = 10;
+const EX_GRID_GAP = 8;
+const EX_CELL_ROWS = 2;
+const EX_RUL_LINES = 4;
+const BADGE_PAD_X = 8;
+const BADGE_PAD_Y = 4;
 
 const C = {
-  pageBg: rgb(0.992, 0.989, 0.984),
-  accent: rgb(0.12, 0.55, 0.75),
-  title: rgb(0.11, 0.13, 0.16),
-  muted: rgb(0.42, 0.44, 0.48),
-  rationaleMuted: rgb(0.38, 0.4, 0.44),
-  headerBg: rgb(0.78, 0.82, 0.86),
-  headerBorder: rgb(0.55, 0.6, 0.65),
-  rowA: rgb(0.98, 0.96, 0.92),
-  rowB: rgb(0.96, 0.97, 0.99),
-  rowBorder: rgb(0.82, 0.84, 0.88),
-  grid: rgb(0.88, 0.89, 0.92),
-  placeholder: rgb(0.72, 0.74, 0.78),
-  boxBg: rgb(0.93, 0.94, 0.96),
-  boxBorder: rgb(0.7, 0.72, 0.76),
+  pageBg: rgb(0.99, 0.99, 0.99),
+  charcoal: rgb(0.12, 0.14, 0.18),
+  terracotta: rgb(0.72, 0.38, 0.28),
+  accentBlue: rgb(0.12, 0.45, 0.62),
+  muted: rgb(0.48, 0.5, 0.54),
+  labelGray: rgb(0.55, 0.57, 0.6),
+  boxBg: rgb(0.94, 0.95, 0.96),
+  boxBorder: rgb(0.78, 0.8, 0.84),
+  gridLine: rgb(0.88, 0.89, 0.91),
+  cellBg: rgb(0.98, 0.98, 0.99),
   footer: rgb(0.45, 0.47, 0.5),
+  placeholder: rgb(0.72, 0.74, 0.78),
+  badgeBg: rgb(0.92, 0.93, 0.94),
+  insightGreen: rgb(0.35, 0.65, 0.45),
+  insightOrange: rgb(0.85, 0.55, 0.25),
+  insightBlue: rgb(0.35, 0.55, 0.75),
 };
 
-function colXs(): number[] {
-  const x0 = MARGIN;
-  return [
-    x0,
-    x0 + COLS.exercise,
-    x0 + COLS.exercise + COLS.target,
-    x0 + COLS.exercise + COLS.target + COLS.s1,
-    x0 + COLS.exercise + COLS.target + COLS.s1 + COLS.s2,
-    x0 + COLS.exercise + COLS.target + COLS.s1 + COLS.s2 + COLS.s3,
-    x0 + COLS.exercise + COLS.target + COLS.s1 + COLS.s2 + COLS.s3 + COLS.s4,
-  ];
-}
-
-function truncateToWidth(
-  text: string,
-  font: PDFFont,
-  size: number,
-  maxW: number,
-): string {
+function truncateToWidth(text: string, font: PDFFont, size: number, maxW: number): string {
   const t = text.replace(/\s+/g, " ").trim();
   if (!t) return "";
   if (font.widthOfTextAtSize(t, size) <= maxW) return t;
@@ -82,7 +65,6 @@ function truncateToWidth(
   return ell;
 }
 
-/** Wortumbruch; lange Einzelwörter werden gekürzt. */
 function wrapTextToLines(
   text: string,
   font: PDFFont,
@@ -136,184 +118,8 @@ function progressionBullets(text: string): string[] {
   return [raw.length > 220 ? `${raw.slice(0, 217)}…` : raw];
 }
 
-function drawVerticalGrid(
-  page: PDFPage,
-  xs: number[],
-  yTopFromPageTop: number,
-  rowHeight: number,
-  pageH: number,
-) {
-  const yBottom = pageH - yTopFromPageTop - rowHeight;
-  const yTopLine = pageH - yTopFromPageTop;
-  for (let i = 1; i < xs.length; i++) {
-    page.drawLine({
-      start: { x: xs[i], y: yBottom },
-      end: { x: xs[i], y: yTopLine },
-      thickness: 0.35,
-      color: C.grid,
-    });
-  }
-}
-
 function drawPageBackground(page: PDFPage) {
-  page.drawRectangle({
-    x: 0,
-    y: 0,
-    width: A4.w,
-    height: A4.h,
-    color: C.pageBg,
-  });
-}
-
-function drawTableHeader(
-  page: PDFPage,
-  yTop: number,
-  xs: number[],
-  colWidths: number[],
-  headers: string[],
-  fontBold: PDFFont,
-) {
-  page.drawRectangle({
-    x: MARGIN,
-    y: A4.h - yTop - HEADER_ROW_H,
-    width: A4.w - 2 * MARGIN,
-    height: HEADER_ROW_H,
-    color: C.headerBg,
-    borderColor: C.headerBorder,
-    borderWidth: 0.6,
-  });
-  drawVerticalGrid(page, xs, yTop, HEADER_ROW_H, A4.h);
-  const hb = A4.h - yTop - HEADER_ROW_H * 0.55 + HEADER_FONT * 0.15;
-  for (let i = 0; i < headers.length; i++) {
-    const t = truncateToWidth(headers[i], fontBold, HEADER_FONT, colWidths[i] - 6);
-    page.drawText(t, {
-      x: xs[i] + 3,
-      y: hb,
-      size: HEADER_FONT,
-      font: fontBold,
-      color: rgb(0.08, 0.09, 0.11),
-    });
-  }
-}
-
-function measurePrescriptionRowHeight(
-  row: NextSessionPrescriptionItem,
-  fontReg: PDFFont,
-): number {
-  const maxWEx = COLS.exercise - 6;
-  const maxWT = COLS.target - 6;
-  const nameLines = wrapTextToLines(row.exercise_name, fontReg, TABLE_FONT, maxWEx, NAME_MAX_LINES);
-  const ratRaw = row.rationale?.trim() ?? "";
-  const ratLines = ratRaw
-    ? wrapTextToLines(ratRaw, fontReg, RATIONALE_FONT, maxWEx, RATIONALE_MAX_LINES)
-    : [];
-  const ziel = `${row.target_sets}×${row.target_reps} @ ${row.suggested_weight}`;
-  const targetLines = wrapTextToLines(ziel, fontReg, TABLE_FONT, maxWT, TARGET_MAX_LINES);
-
-  const nameH = nameLines.length * LINE_H;
-  const ratH = ratLines.length > 0 ? ratLines.length * LINE_H_SMALL + 4 : 0;
-  const exH = nameH + ratH + 8;
-  const targH = targetLines.length * LINE_H + 8;
-  return Math.max(MIN_ROW_H, exH, targH);
-}
-
-function drawPrescriptionRow(
-  page: PDFPage,
-  yTop: number,
-  row: NextSessionPrescriptionItem,
-  rowH: number,
-  xs: number[],
-  fontReg: PDFFont,
-  alt: boolean,
-) {
-  page.drawRectangle({
-    x: MARGIN,
-    y: A4.h - yTop - rowH,
-    width: A4.w - 2 * MARGIN,
-    height: rowH,
-    color: alt ? C.rowA : C.rowB,
-    borderColor: C.rowBorder,
-    borderWidth: 0.35,
-  });
-  drawVerticalGrid(page, xs, yTop, rowH, A4.h);
-
-  const maxWEx = COLS.exercise - 6;
-  const maxWT = COLS.target - 6;
-  const nameLines = wrapTextToLines(row.exercise_name, fontReg, TABLE_FONT, maxWEx, NAME_MAX_LINES);
-  const ratRaw = row.rationale?.trim() ?? "";
-  const ratLines = ratRaw
-    ? wrapTextToLines(ratRaw, fontReg, RATIONALE_FONT, maxWEx, RATIONALE_MAX_LINES)
-    : [];
-  const ziel = `${row.target_sets}×${row.target_reps} @ ${row.suggested_weight}`;
-  const targetLines = wrapTextToLines(ziel, fontReg, TABLE_FONT, maxWT, TARGET_MAX_LINES);
-
-  let lineTop = yTop + 4;
-  for (const line of nameLines) {
-    const t = truncateToWidth(line, fontReg, TABLE_FONT, maxWEx);
-    const baseline = A4.h - lineTop - TABLE_FONT * 0.75;
-    page.drawText(t, { x: xs[0] + 3, y: baseline, size: TABLE_FONT, font: fontReg, color: rgb(0.08, 0.08, 0.08) });
-    lineTop += LINE_H;
-  }
-  if (ratLines.length > 0) {
-    lineTop += 2;
-    for (const line of ratLines) {
-      const t = truncateToWidth(line, fontReg, RATIONALE_FONT, maxWEx);
-      const baseline = A4.h - lineTop - RATIONALE_FONT * 0.75;
-      page.drawText(t, {
-        x: xs[0] + 3,
-        y: baseline,
-        size: RATIONALE_FONT,
-        font: fontReg,
-        color: C.rationaleMuted,
-      });
-      lineTop += LINE_H_SMALL;
-    }
-  }
-
-  let tTop = yTop + 4;
-  for (const line of targetLines) {
-    const t = truncateToWidth(line, fontReg, TABLE_FONT, maxWT);
-    const baseline = A4.h - tTop - TABLE_FONT * 0.75;
-    page.drawText(t, { x: xs[1] + 3, y: baseline, size: TABLE_FONT, font: fontReg, color: rgb(0.08, 0.08, 0.08) });
-    tTop += LINE_H;
-  }
-
-  const setXs = [xs[2], xs[3], xs[4], xs[5]];
-  const setW = [COLS.s1, COLS.s2, COLS.s3, COLS.s4];
-  const centerBaseline =
-    A4.h - yTop - rowH / 2 - PLACEHOLDER_FONT * 0.35;
-  for (let s = 0; s < 4; s++) {
-    page.drawText("—", {
-      x: setXs[s] + 3,
-      y: centerBaseline,
-      size: PLACEHOLDER_FONT,
-      font: fontReg,
-      color: C.placeholder,
-    });
-    const lw = fontReg.widthOfTextAtSize(PLACEHOLDER_LABEL, 6.5);
-    page.drawText(PLACEHOLDER_LABEL, {
-      x: setXs[s] + (setW[s] - lw) / 2,
-      y: centerBaseline - PLACEHOLDER_FONT - 1,
-      size: 6.5,
-      font: fontReg,
-      color: C.placeholder,
-    });
-  }
-  const nw = fontReg.widthOfTextAtSize(PLACEHOLDER_LABEL, 6.5);
-  page.drawText("—", {
-    x: xs[6] + 3,
-    y: centerBaseline,
-    size: PLACEHOLDER_FONT,
-    font: fontReg,
-    color: C.placeholder,
-  });
-  page.drawText(PLACEHOLDER_LABEL, {
-    x: xs[6] + (COLS.notes - nw) / 2,
-    y: centerBaseline - PLACEHOLDER_FONT - 1,
-    size: 6.5,
-    font: fontReg,
-    color: C.placeholder,
-  });
+  page.drawRectangle({ x: 0, y: 0, width: A4.w, height: A4.h, color: C.pageBg });
 }
 
 function drawPageFooters(pdf: PDFDocument, fontReg: PDFFont, totalPages: number) {
@@ -332,8 +138,222 @@ function drawPageFooters(pdf: PDFDocument, fontReg: PDFFont, totalPages: number)
   }
 }
 
+function makeDocId(): string {
+  const t = Date.now().toString(36).toUpperCase().slice(-8);
+  return `WA-${t}`;
+}
+
+/** Innenbreite eines Übungsblocks (ohne linken Seitenrand, mit Platz für Akzentbalken) */
+function exerciseInnerX(): number {
+  return MARGIN + ACCENT_BAR_W + 10;
+}
+
+function exerciseInnerW(): number {
+  return A4.w - exerciseInnerX() - MARGIN;
+}
+
+function measureExerciseBlockHeight(row: NextSessionPrescriptionItem, fontBold: PDFFont): number {
+  const iw = exerciseInnerW();
+  const nameLines = wrapTextToLines(`88. ${row.exercise_name}`, fontBold, EX_NAME, iw, 2);
+  let h = EX_BLOCK_PAD;
+  h += nameLines.length * EX_NAME_LINE;
+  h += 8;
+  h += EX_TARGET_H;
+  const rat = row.rationale?.trim() ?? "";
+  if (rat) {
+    h += EX_BADGE + BADGE_PAD_Y * 2 + 8;
+  }
+  h += 8;
+  const cellH = measureGridCellHeight();
+  h += EX_CELL_ROWS * cellH + EX_GRID_GAP;
+  h += EX_BLOCK_PAD;
+  return h;
+}
+
+function measureGridCellHeight(): number {
+  const labelH = 12;
+  const linesH = EX_RUL_LINES * (CELL_LINE + 2);
+  return labelH + linesH + 8;
+}
+
+function drawRuledCell(
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  w: number,
+  h: number,
+  label: string,
+  fontBold: PDFFont,
+) {
+  page.drawRectangle({
+    x,
+    y: A4.h - yTop - h,
+    width: w,
+    height: h,
+    color: C.cellBg,
+    borderColor: C.boxBorder,
+    borderWidth: 0.45,
+  });
+  const lb = A4.h - yTop - 10;
+  page.drawText(label, {
+    x: x + 6,
+    y: lb,
+    size: CELL_LABEL,
+    font: fontBold,
+    color: C.labelGray,
+  });
+  const lineStart = yTop + 18;
+  for (let i = 0; i < EX_RUL_LINES; i++) {
+    const ly = lineStart + i * (CELL_LINE + 2);
+    page.drawLine({
+      start: { x: x + 6, y: A4.h - ly },
+      end: { x: x + w - 6, y: A4.h - ly },
+      thickness: 0.25,
+      color: C.gridLine,
+    });
+  }
+}
+
+function drawExerciseBlock(
+  page: PDFPage,
+  yTop: number,
+  index: number,
+  row: NextSessionPrescriptionItem,
+  fontBold: PDFFont,
+  fontReg: PDFFont,
+): number {
+  const blockH = measureExerciseBlockHeight(row, fontBold);
+  const x0 = MARGIN;
+  const iw = exerciseInnerW();
+  const ix = exerciseInnerX();
+
+  page.drawRectangle({
+    x: x0,
+    y: A4.h - yTop - blockH,
+    width: A4.w - 2 * MARGIN,
+    height: blockH,
+    color: rgb(0.995, 0.995, 0.995),
+    borderColor: C.boxBorder,
+    borderWidth: 0.4,
+  });
+  page.drawRectangle({
+    x: x0 + 2,
+    y: A4.h - yTop - blockH + 4,
+    width: ACCENT_BAR_W,
+    height: blockH - 8,
+    color: C.charcoal,
+  });
+
+  let cursor = yTop + EX_BLOCK_PAD;
+  const num = String(index + 1).padStart(2, "0");
+  const nameLines = wrapTextToLines(row.exercise_name, fontBold, EX_NAME, iw, 2);
+  for (const line of nameLines) {
+    const t = truncateToWidth(line, fontBold, EX_NAME, iw);
+    page.drawText(`${num}. ${t}`, {
+      x: ix,
+      y: A4.h - cursor - EX_NAME * 0.75,
+      size: EX_NAME,
+      font: fontBold,
+      color: C.charcoal,
+    });
+    cursor += EX_NAME_LINE;
+  }
+  if (nameLines.length === 1) cursor += EX_NAME_LINE;
+  cursor += 4;
+
+  const targetStr = `Target: ${row.target_sets} × ${row.target_reps} @ ${row.suggested_weight}`;
+  page.drawText(truncateToWidth(targetStr, fontReg, EX_TARGET, iw), {
+    x: ix,
+    y: A4.h - cursor - EX_TARGET * 0.75,
+    size: EX_TARGET,
+    font: fontReg,
+    color: C.terracotta,
+  });
+  cursor += EX_TARGET_H;
+
+  const rat = row.rationale?.trim() ?? "";
+  if (rat) {
+    const badgeText = (rat.length > 48 ? `${rat.slice(0, 45)}…` : rat).toUpperCase();
+    const bw = Math.min(iw - 4, fontReg.widthOfTextAtSize(badgeText, EX_BADGE) + BADGE_PAD_X * 2);
+    const bh = EX_BADGE + BADGE_PAD_Y * 2;
+    cursor += 4;
+    page.drawRectangle({
+      x: ix,
+      y: A4.h - cursor - bh,
+      width: bw,
+      height: bh,
+      color: C.badgeBg,
+      borderColor: C.boxBorder,
+      borderWidth: 0.35,
+    });
+    page.drawText(badgeText, {
+      x: ix + BADGE_PAD_X,
+      y: A4.h - cursor - BADGE_PAD_Y - EX_BADGE * 0.75,
+      size: EX_BADGE,
+      font: fontReg,
+      color: C.muted,
+    });
+    cursor += bh + 4;
+  }
+
+  cursor += 4;
+  const cellH = measureGridCellHeight();
+  const gap = EX_GRID_GAP;
+  const colW = (iw - gap) / 2;
+
+  drawRuledCell(page, ix, cursor, colW, cellH, "SET 1", fontBold);
+  drawRuledCell(page, ix + colW + gap, cursor, colW, cellH, "SET 2", fontBold);
+  cursor += cellH + gap;
+  drawRuledCell(page, ix, cursor, colW, cellH, "SET 3", fontBold);
+  drawRuledCell(page, ix + colW + gap, cursor, colW, cellH, "NOTIZEN / RPE", fontBold);
+
+  return blockH;
+}
+
+function measureProgressionSectionHeight(
+  bullets: string[],
+  fontReg: PDFFont,
+  innerW: number,
+): { titleAndGap: number; boxH: number } {
+  const boxPad = 12;
+  const bulletParaLine = 12;
+  const bulletGap = 6;
+  let progressionContentH = boxPad * 2;
+  for (const b of bullets) {
+    const raw = b.trim();
+    if (!raw) continue;
+    const lines = wrapTextToLines(`• ${raw}`, fontReg, BULLET, innerW, 12);
+    progressionContentH += lines.length * bulletParaLine + bulletGap;
+  }
+  if (progressionContentH <= boxPad * 2) {
+    progressionContentH += bulletParaLine + bulletGap;
+  }
+  progressionContentH -= bulletGap;
+  const boxH = Math.max(40, progressionContentH);
+  return { titleAndGap: 26, boxH };
+}
+
+function measureCoachSectionHeight(tips: string[], fontReg: PDFFont, innerW: number): { titleAndGap: number; boxH: number } {
+  const boxPad = 12;
+  const tipLineH = 11;
+  let tipsBoxH = boxPad * 2;
+  for (const tip of tips) {
+    const lines = wrapTextToLines(tip, fontReg, TIP, innerW, 4);
+    tipsBoxH += lines.length * tipLineH + 8;
+  }
+  tipsBoxH -= 8;
+  tipsBoxH = Math.max(36, tipsBoxH);
+  return { titleAndGap: 28, boxH: tipsBoxH };
+}
+
+function measureJournalNotesHeight(): number {
+  const header = 22;
+  const boxH = 88;
+  return header + boxH + 16;
+}
+
 /**
- * Druckvorlage: Session-Tabelle mit Raster, warmem Hintergrund, Progression-Kasten.
+ * Trainings-Log PDF: Header im Report-Stil, Übungsblöcke mit 2×2-Set-Grid, Insights & Coach-Tipps.
  */
 export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise<Uint8Array> {
   const prescription = result.next_session_prescription ?? [];
@@ -343,83 +363,76 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
 
   let page = pdf.addPage([A4.w, A4.h]);
   drawPageBackground(page);
-  const xs = colXs();
 
-  const headers = [
-    "Übung",
-    "Ziel (Vorgabe)",
-    "Satz 1",
-    "Satz 2",
-    "Satz 3",
-    "Satz 4",
-    "Gefühl / Notizen",
-  ];
-  const colWidths = [
-    COLS.exercise,
-    COLS.target,
-    COLS.s1,
-    COLS.s2,
-    COLS.s3,
-    COLS.s4,
-    COLS.notes,
-  ];
+  let yTop = 40;
+  const docId = makeDocId();
+  const locationLabel =
+    process.env.PDF_LOCATION_LABEL?.trim() || "Training";
 
-  let yTop = 46;
-
-  const title = "Trainings-Log: Nächste Session (Vorschlag)";
-  const titleW = fontBold.widthOfTextAtSize(title, TITLE);
-  const accentW = Math.min(titleW, A4.w - 2 * MARGIN);
-  const titleBaseline = A4.h - yTop - TITLE * 0.85;
-  page.drawText(title, {
+  const brand = "WORKOUT ANALYZER";
+  const sub = "OFFICIAL TRAINING REPORT";
+  page.drawText(brand, {
     x: MARGIN,
-    y: titleBaseline,
-    size: TITLE,
+    y: A4.h - yTop - BRAND * 0.75,
+    size: BRAND,
     font: fontBold,
-    color: C.title,
+    color: C.charcoal,
   });
-  page.drawRectangle({
+  page.drawText(sub, {
     x: MARGIN,
-    y: A4.h - yTop - 6,
-    width: accentW,
-    height: 3.5,
-    color: C.accent,
+    y: A4.h - yTop - BRAND - BRAND_SUB * 0.75,
+    size: BRAND_SUB,
+    font: fontBold,
+    color: C.terracotta,
   });
-  yTop += TITLE + 10;
+  const idText = `DOCUMENT ID / ${docId}`;
+  const idW = fontReg.widthOfTextAtSize(idText, LABEL);
+  page.drawText(idText, {
+    x: A4.w - MARGIN - idW,
+    y: A4.h - yTop - LABEL * 0.75,
+    size: LABEL,
+    font: fontReg,
+    color: C.labelGray,
+  });
+  yTop += BRAND + BRAND_SUB + 16;
 
+  const sessionTitle = "Trainings-Log: Nächste Session (Vorschlag)";
   const stamp = new Date().toLocaleString("de-DE", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Europe/Berlin",
   });
-  page.drawText(stamp, {
-    x: MARGIN,
-    y: A4.h - yTop - SUB * 0.75,
-    size: SUB,
-    font: fontReg,
-    color: C.muted,
-  });
-  yTop += SUB + 22;
 
-  const ensureTableSpace = (h: number) => {
-    if (A4.h - yTop - h < MARGIN + CONTENT_BOTTOM_RESERVE) {
-      page = pdf.addPage([A4.w, A4.h]);
-      drawPageBackground(page);
-      yTop = 46;
-      drawTableHeader(page, yTop, xs, colWidths, headers, fontBold);
-      yTop += HEADER_ROW_H + 1;
-    }
+  const labelRow = (label: string, value: string, valueBold: boolean) => {
+    page.drawText(label.toUpperCase(), {
+      x: MARGIN,
+      y: A4.h - yTop - LABEL * 0.75,
+      size: LABEL,
+      font: fontReg,
+      color: C.labelGray,
+    });
+    yTop += 11;
+    page.drawText(value, {
+      x: MARGIN,
+      y: A4.h - yTop - META * 0.75,
+      size: META,
+      font: valueBold ? fontBold : fontReg,
+      color: C.charcoal,
+    });
+    yTop += META + 8;
   };
 
-  const ensureContentSpace = (h: number) => {
-    if (A4.h - yTop - h < MARGIN + CONTENT_BOTTOM_RESERVE) {
-      page = pdf.addPage([A4.w, A4.h]);
-      drawPageBackground(page);
-      yTop = 46;
-    }
-  };
+  labelRow("SESSION TITLE", sessionTitle, true);
+  labelRow("DATE & TIME", stamp, false);
+  labelRow("LOCATION", locationLabel, false);
 
-  ensureTableSpace(HEADER_ROW_H + 8);
-  drawTableHeader(page, yTop, xs, colWidths, headers, fontBold);
-  yTop += HEADER_ROW_H + 1;
+  page.drawLine({
+    start: { x: MARGIN, y: A4.h - yTop },
+    end: { x: A4.w - MARGIN, y: A4.h - yTop },
+    thickness: 0.6,
+    color: C.charcoal,
+  });
+  yTop += 20;
 
   const rows: NextSessionPrescriptionItem[] =
     prescription.length > 0
@@ -434,54 +447,68 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
           },
         ];
 
-  rows.forEach((row, idx) => {
-    const rowH = measurePrescriptionRowHeight(row, fontReg);
-    ensureTableSpace(rowH + 4);
-    drawPrescriptionRow(page, yTop, row, rowH, xs, fontReg, idx % 2 === 0);
-    yTop += rowH + 0.5;
-  });
+  const innerW = A4.w - 2 * MARGIN - 24;
 
-  page.drawLine({
-    start: { x: MARGIN, y: A4.h - yTop },
-    end: { x: A4.w - MARGIN, y: A4.h - yTop },
-    thickness: 0.45,
-    color: C.grid,
-  });
-  yTop += 18;
-  ensureContentSpace(90);
+  const ensureSpace = (h: number) => {
+    if (A4.h - yTop - h < MARGIN + CONTENT_BOTTOM_RESERVE) {
+      page = pdf.addPage([A4.w, A4.h]);
+      drawPageBackground(page);
+      yTop = 46;
+    }
+  };
 
-  page.drawText("Progression & Einblicke", {
-    x: MARGIN,
-    y: A4.h - yTop - 9,
-    size: 11.5,
-    font: fontBold,
-    color: C.title,
-  });
-  yTop += 22;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const bh = measureExerciseBlockHeight(row, fontBold) + 12;
+    ensureSpace(bh);
+    drawExerciseBlock(page, yTop, i, row, fontBold, fontReg);
+    yTop += measureExerciseBlockHeight(row, fontBold) + 12;
+  }
+
+  yTop += 8;
 
   const bullets = progressionBullets(result.progressive_overload_analysis);
-  const boxPad = 12;
-  const bulletSize = 9.5;
-  const bulletParaLine = 12;
-  const bulletGap = 6;
-  const innerW = A4.w - 2 * MARGIN - 2 * boxPad - 10;
-  let progressionContentH = boxPad * 2;
   const bulletLayouts: { lines: string[] }[] = [];
   for (const b of bullets) {
     const raw = b.trim();
     if (!raw) continue;
-    const lines = wrapTextToLines(`• ${raw}`, fontReg, bulletSize, innerW, 12);
+    const lines = wrapTextToLines(`• ${raw}`, fontReg, BULLET, innerW, 12);
     bulletLayouts.push({ lines });
-    progressionContentH += lines.length * bulletParaLine + bulletGap;
   }
   if (bulletLayouts.length === 0) {
     bulletLayouts.push({ lines: ["• —"] });
-    progressionContentH += bulletParaLine + bulletGap;
   }
-  progressionContentH -= bulletGap;
-  const boxH = Math.max(40, progressionContentH);
 
-  ensureContentSpace(boxH + 28);
+  const progMeasured = measureProgressionSectionHeight(
+    bullets.length ? bullets : ["—"],
+    fontReg,
+    innerW,
+  );
+  const progTotalH = progMeasured.titleAndGap + progMeasured.boxH + 20;
+
+  ensureSpace(progTotalH);
+
+  page.drawRectangle({
+    x: MARGIN,
+    y: A4.h - yTop - 14,
+    width: ACCENT_BAR_W,
+    height: 14,
+    color: C.accentBlue,
+  });
+  page.drawText("Progression & Einblicke", {
+    x: MARGIN + ACCENT_BAR_W + 8,
+    y: A4.h - yTop - 9,
+    size: SECTION,
+    font: fontBold,
+    color: C.charcoal,
+  });
+  yTop += 22;
+
+  const boxPad = 12;
+  const bulletParaLine = 12;
+  const bulletGap = 6;
+  const boxH = progMeasured.boxH;
+
   page.drawRectangle({
     x: MARGIN,
     y: A4.h - yTop - boxH,
@@ -495,11 +522,11 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
   let lineFromTop = yTop + boxPad + 2;
   bulletLayouts.forEach((bl, bi) => {
     for (const line of bl.lines) {
-      const baseline = A4.h - lineFromTop - bulletSize * 0.75;
+      const baseline = A4.h - lineFromTop - BULLET * 0.75;
       page.drawText(line, {
         x: MARGIN + boxPad,
         y: baseline,
-        size: bulletSize,
+        size: BULLET,
         font: fontReg,
         color: rgb(0.18, 0.19, 0.22),
       });
@@ -511,29 +538,41 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
 
   const tips = (result.coach_tips ?? []).filter((t) => t.trim()).slice(0, 6);
   if (tips.length > 0) {
-    ensureContentSpace(28 + 8);
-    page.drawText("Coach-Tipps", {
+    const coachMeasured = measureCoachSectionHeight(tips, fontReg, innerW - 14);
+    const coachTotal = coachMeasured.titleAndGap + coachMeasured.boxH + 20;
+    ensureSpace(coachTotal);
+
+    page.drawRectangle({
       x: MARGIN,
-      y: A4.h - yTop - 9,
-      size: 11.5,
+      y: A4.h - yTop - 14,
+      width: ACCENT_BAR_W,
+      height: 14,
+      color: C.terracotta,
+    });
+    page.drawText("COACH-TIPPS", {
+      x: MARGIN + ACCENT_BAR_W + 8,
+      y: A4.h - yTop - 8,
+      size: LABEL,
       font: fontBold,
-      color: C.title,
+      color: C.labelGray,
+    });
+    yTop += 12;
+    page.drawText("Insights & Coach Tips", {
+      x: MARGIN + ACCENT_BAR_W + 8,
+      y: A4.h - yTop - 10,
+      size: SECTION,
+      font: fontBold,
+      color: C.charcoal,
     });
     yTop += 22;
 
-    const tipSize = 9;
+    const tipsBoxH = coachMeasured.boxH;
     const tipLineH = 11;
-    let tipsBoxH = boxPad * 2;
     const tipLayouts: string[][] = [];
     for (const tip of tips) {
-      const lines = wrapTextToLines(tip, fontReg, tipSize, innerW, 4);
-      tipLayouts.push(lines);
-      tipsBoxH += lines.length * tipLineH + 8;
+      tipLayouts.push(wrapTextToLines(tip, fontReg, TIP, innerW - 14, 4));
     }
-    tipsBoxH -= 8;
-    tipsBoxH = Math.max(36, tipsBoxH);
 
-    ensureContentSpace(tipsBoxH + 20);
     page.drawRectangle({
       x: MARGIN,
       y: A4.h - yTop - tipsBoxH,
@@ -544,13 +583,24 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
       borderWidth: 0.55,
     });
     let tipTop = yTop + boxPad + 2;
+    const accentColors = [C.insightGreen, C.insightOrange, C.insightBlue];
+    let tipIdx = 0;
     for (const lines of tipLayouts) {
+      const ac = accentColors[tipIdx % accentColors.length];
+      page.drawRectangle({
+        x: MARGIN + boxPad,
+        y: A4.h - tipTop - 8,
+        width: 4,
+        height: 8,
+        color: ac,
+      });
+      tipIdx++;
       for (const line of lines) {
-        const baseline = A4.h - tipTop - tipSize * 0.75;
+        const baseline = A4.h - tipTop - TIP * 0.75;
         page.drawText(line, {
-          x: MARGIN + boxPad,
+          x: MARGIN + boxPad + 10,
           y: baseline,
-          size: tipSize,
+          size: TIP,
           font: fontReg,
           color: rgb(0.18, 0.19, 0.22),
         });
@@ -561,20 +611,60 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
     yTop += tipsBoxH + 22;
   }
 
-  ensureContentSpace(36);
+  const journalH = measureJournalNotesHeight();
+  ensureSpace(journalH);
+
+  page.drawText("ABSCHLUSS-GEDANKEN / JOURNAL", {
+    x: MARGIN,
+    y: A4.h - yTop - 9,
+    size: SECTION,
+    font: fontBold,
+    color: C.charcoal,
+  });
+  yTop += 22;
+
+  const jBoxH = 88;
+  page.drawRectangle({
+    x: MARGIN,
+    y: A4.h - yTop - jBoxH,
+    width: A4.w - 2 * MARGIN,
+    height: jBoxH,
+    color: rgb(1, 1, 1),
+    borderColor: C.boxBorder,
+    borderWidth: 0.55,
+  });
+  for (let j = 0; j < 5; j++) {
+    const ly = yTop + 16 + j * 14;
+    page.drawLine({
+      start: { x: MARGIN + 10, y: A4.h - ly },
+      end: { x: A4.w - MARGIN - 10, y: A4.h - ly },
+      thickness: 0.25,
+      color: C.gridLine,
+    });
+  }
+  page.drawText("Notizen zu Wohlbefinden, Schlaf oder Intensität …", {
+    x: MARGIN + 12,
+    y: A4.h - yTop - 12,
+    size: 8,
+    font: fontReg,
+    color: C.placeholder,
+  });
+  yTop += jBoxH + 18;
+
+  ensureSpace(36);
   page.drawLine({
     start: { x: MARGIN, y: A4.h - yTop },
     end: { x: A4.w - MARGIN, y: A4.h - yTop },
     thickness: 0.4,
-    color: C.grid,
+    color: C.gridLine,
   });
-  yTop += 10;
+  yTop += 12;
 
-  ensureContentSpace(14);
-  page.drawText("Blatt speichern / scannen und wieder in die App laden.", {
+  ensureSpace(16);
+  page.drawText("BLATT SPEICHERN / SCANNEN UND WIEDER IN DIE APP LADEN.", {
     x: MARGIN,
-    y: A4.h - yTop - 9,
-    size: 9,
+    y: A4.h - yTop - FOOT * 0.75,
+    size: FOOT,
     font: fontReg,
     color: C.footer,
   });
@@ -582,6 +672,5 @@ export async function buildWorkoutLogPdf(result: WorkoutAnalysisResult): Promise
   const totalPages = pdf.getPageCount();
   drawPageFooters(pdf, fontReg, totalPages);
 
-  const bytes = await pdf.save();
-  return bytes;
+  return pdf.save();
 }
