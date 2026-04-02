@@ -8,6 +8,7 @@ import {
 import { generateWorkoutAnalysisContent } from "@/lib/gemini-workout-generate";
 import { geminiHttpErrorResponse } from "@/lib/gemini-route-errors";
 import { parseAnalysisJson } from "@/lib/parse-analysis-json";
+import { parsePriorExtractedField } from "@/lib/prior-extracted";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getServerMaxPdfBytes } from "@/lib/upload-limits";
 
@@ -23,7 +24,12 @@ const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-pro";
 
 const SYSTEM_PROMPT = `Du bist ein professioneller Powerlifting- und Fitness-Coach. Im Anhang findest du ein PDF mit handschriftlichen Trainingsaufzeichnungen.
 
-Aufgabe 1: Lies alle Daten aus (Datum, Übung, Sätze, Wiederholungen, Gewicht). Achtung: Die Notizen sind handschriftlich und teils unordentlich.
+Kumulation (wenn die User-Nachricht einen JSON-Block mit bereits gespeicherten Trainingstagen enthält):
+Das PDF beschreibt genau **eine** zusätzliche Trainingseinheit (ein Workout-Tag). Extrahiere aus dem PDF nur diese neue Einheit. Die bestehenden Tage aus dem JSON vollständig übernehmen (gleiche Struktur), den neuen Tag anfügen und extracted_data nach Datum sortieren (wie im Log lesbar). Wenn ein Datum bereits existiert: Übungen aus dem PDF in diesen Tag einarbeiten — bei gleichem Übungsnamen die Zeile aus dem PDF behalten. progressive_overload_analysis, coach_tips und next_session_prescription beziehen sich auf die **gesamte** kombinierte Historie (alter Stand + neuer Tag).
+
+Ohne solchen JSON-Block (Erst-Upload oder „Neue Analyse“): verhalte dich wie ein Einzel-Upload — lies alle Trainingstage aus dem PDF wie gewohnt.
+
+Aufgabe 1: Lies die relevanten Daten aus (Datum, Übung, Sätze, Wiederholungen, Gewicht). Achtung: Die Notizen sind handschriftlich und teils unordentlich.
 
 Aufgabe 2: Analysiere den "Progressive Overload" über die verschiedenen Trainingstage. Wo gab es Steigerungen im Gewicht oder Volumen?
 
@@ -37,8 +43,15 @@ Antwortformat: reines JSON ohne Markdown-Fences (das Ausgabe-Schema ist API-seit
 
 Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.`;
 
-const USER_FOLLOWUP =
-  "Bitte analysiere das beigefügte PDF vollständig gemäß den Systemanweisungen. Antworte ausschließlich mit dem JSON-Objekt.";
+function buildUserFollowup(priorCount: number, priorJson: string): string {
+  const base =
+    "Bitte analysiere das beigefügte PDF vollständig gemäß den Systemanweisungen. Antworte ausschließlich mit dem JSON-Objekt.";
+  if (priorCount === 0) return base;
+  return `${base}
+
+Bereits gespeicherte Trainingstage (JSON — in extracted_data übernehmen und um die neue Einheit aus dem PDF ergänzen):
+${priorJson}`;
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -182,6 +195,7 @@ export async function POST(request: Request) {
     const equipmentNarrative = parseEquipmentContextField(
       form.get("equipment_context"),
     );
+    const priorExtracted = parsePriorExtractedField(form.get("prior_extracted_data"));
     const systemPrompt = buildWorkoutSystemPrompt(
       SYSTEM_PROMPT,
       equipmentNarrative,
@@ -191,11 +205,16 @@ export async function POST(request: Request) {
     const { parts, cleanup: doCleanup } = await pdfToParts(ai, buf, inlineLimit);
     cleanup = doCleanup;
 
+    const userFollowup = buildUserFollowup(
+      priorExtracted.length,
+      JSON.stringify(priorExtracted),
+    );
+
     const response = await generateWorkoutAnalysisContent(
       ai,
       MODEL,
       parts,
-      USER_FOLLOWUP,
+      userFollowup,
       systemPrompt,
     );
 

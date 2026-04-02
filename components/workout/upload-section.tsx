@@ -63,7 +63,10 @@ export function UploadSection({
         </CardTitle>
         <CardDescription>
           Drag & Drop oder Datei wählen — nur PDF, max. {maxClientMb} MB
-          {vercelHint ? " (Vercel-kompatibel)" : ""}
+          {vercelHint ? " (Vercel-kompatibel)" : ""}. Solange du eine Analyse offen
+          hast, gilt jedes neue PDF als <strong>eine zusätzliche</strong> Session; die
+          Tabelle wächst kumulativ (lokal in diesem Browser). „Neue Analyse“ startet
+          ohne vorherige Einträge.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

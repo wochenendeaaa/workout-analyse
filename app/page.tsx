@@ -25,6 +25,7 @@ import {
   type EquipmentContextPayload,
 } from "@/lib/equipment-context";
 import { mergeAnalysisHistories } from "@/lib/merge-analyses-history";
+import { MAX_PRIOR_EXTRACTED_DAYS } from "@/lib/prior-extracted";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -107,6 +108,9 @@ export default function Home() {
 
   const analyze = useCallback(
     async (file: File) => {
+      const priorExtracted = (result?.extracted_data ?? []).slice(
+        -MAX_PRIOR_EXTRACTED_DAYS,
+      );
       setError(null);
       setResult(null);
       setFileName(file.name);
@@ -131,6 +135,7 @@ export default function Home() {
         const body = new FormData();
         body.append("file", file);
         body.append("equipment_context", stringifyEquipmentPayload(equipment));
+        body.append("prior_extracted_data", JSON.stringify(priorExtracted));
 
         const res = await fetch("/api/analyze", {
           method: "POST",
@@ -167,7 +172,7 @@ export default function Home() {
         setLoading(false);
       }
     },
-    [equipment, refreshMergedHistory],
+    [equipment, refreshMergedHistory, result],
   );
 
   const restoreHistoryEntry = useCallback((entry: StoredAnalysis) => {

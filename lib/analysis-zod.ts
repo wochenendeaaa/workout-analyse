@@ -7,7 +7,7 @@ const extractedExerciseSchema = z.object({
   weight: z.string(),
 });
 
-const extractedDaySchema = z.object({
+export const extractedDaySchema = z.object({
   date: z.string(),
   exercises: z.array(extractedExerciseSchema),
 });
