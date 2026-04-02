@@ -1,13 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { secretKey } from "@/lib/auth-secret";
 
 const COOKIE = "wo_session";
-
-function secretKey(): Uint8Array | null {
-  const s = process.env.AUTH_SECRET?.trim();
-  if (!s || s.length < 32) return null;
-  return new TextEncoder().encode(s);
-}
 
 export function authConfigured(): boolean {
   return secretKey() !== null;

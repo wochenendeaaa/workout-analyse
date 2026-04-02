@@ -23,8 +23,16 @@ import {
 import { userMessageForApiCode } from "@/lib/api-error-messages";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacement-panel";
-import { ChevronRight, ClipboardList, FileDown } from "lucide-react";
+import { Calendar, ChevronRight, ClipboardList, FileDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+function defaultNextSessionLocal(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(18, 0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 type SortKey = "date" | "name" | "sets" | "reps" | "weight";
 type SortDir = "asc" | "desc";
@@ -100,6 +108,16 @@ export function ResultsSection({
   const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(
     null,
   );
+  const [calStatus, setCalStatus] = useState<{
+    configured: boolean;
+    connected: boolean;
+    loggedIn: boolean;
+  } | null>(null);
+  const [calStartLocal, setCalStartLocal] = useState(defaultNextSessionLocal);
+  const [calDurationMin, setCalDurationMin] = useState(90);
+  const [calMessage, setCalMessage] = useState<string | null>(null);
+  const [calEventLink, setCalEventLink] = useState<string | null>(null);
+  const [calBusy, setCalBusy] = useState(false);
 
   const prescription = result.next_session_prescription ?? [];
 
@@ -124,6 +142,125 @@ export function ResultsSection({
       cancelled = true;
     };
   }, []);
+
+  const refreshCalStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/google-calendar/status", {
+        credentials: "same-origin",
+      });
+      const data = (await res.json()) as {
+        configured?: boolean;
+        connected?: boolean;
+        loggedIn?: boolean;
+      };
+      setCalStatus({
+        configured: data.configured === true,
+        connected: data.connected === true,
+        loggedIn: data.loggedIn === true,
+      });
+    } catch {
+      setCalStatus({
+        configured: false,
+        connected: false,
+        loggedIn: false,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCalStatus();
+  }, [refreshCalStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const u = new URL(window.location.href);
+    const cal = u.searchParams.get("calendar");
+    if (cal === "connected") {
+      setCalMessage("Google-Kalender wurde verbunden.");
+      u.searchParams.delete("calendar");
+      u.searchParams.delete("reason");
+      window.history.replaceState({}, "", `${u.pathname}${u.search}`);
+      void refreshCalStatus();
+    } else if (cal === "error") {
+      setCalEventLink(null);
+      const reason = u.searchParams.get("reason") ?? "";
+      setCalMessage(
+        reason
+          ? `Google-Verbindung fehlgeschlagen (${reason}).`
+          : "Google-Verbindung fehlgeschlagen.",
+      );
+      u.searchParams.delete("calendar");
+      u.searchParams.delete("reason");
+      window.history.replaceState({}, "", `${u.pathname}${u.search}`);
+    }
+  }, [refreshCalStatus]);
+
+  const createCalendarEvent = useCallback(async () => {
+    setCalMessage(null);
+    setCalBusy(true);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const start = new Date(calStartLocal);
+      if (Number.isNaN(start.getTime())) {
+        setCalMessage("Ungültige Startzeit.");
+        return;
+      }
+      const res = await fetch("/api/google-calendar/event", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          result,
+          timeZone: tz,
+          start: start.toISOString(),
+          durationMinutes: calDurationMin,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        code?: string;
+        htmlLink?: string | null;
+        retryAfterSec?: number;
+      };
+      if (!res.ok) {
+        setCalMessage(
+          userMessageForApiCode(json.code, json.error ?? "", {
+            context: "calendar",
+            retryAfterSec: json.retryAfterSec,
+          }),
+        );
+        return;
+      }
+      setCalMessage("Termin wurde im Google-Kalender angelegt.");
+      setCalEventLink(typeof json.htmlLink === "string" ? json.htmlLink : null);
+    } catch {
+      setCalMessage("Netzwerkfehler beim Kalender-Eintrag.");
+    } finally {
+      setCalBusy(false);
+    }
+  }, [result, calStartLocal, calDurationMin]);
+
+  const disconnectCalendar = useCallback(async () => {
+    setCalMessage(null);
+    setCalEventLink(null);
+    setCalBusy(true);
+    try {
+      const res = await fetch("/api/google-calendar/disconnect", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        setCalMessage("Trennen der Google-Verbindung fehlgeschlagen.");
+        return;
+      }
+      setCalMessage("Google-Kalender-Verbindung getrennt.");
+      await refreshCalStatus();
+    } catch {
+      setCalMessage("Netzwerkfehler.");
+    } finally {
+      setCalBusy(false);
+    }
+  }, [refreshCalStatus]);
 
   const filteredRows = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
@@ -393,6 +530,115 @@ export function ResultsSection({
               {pdfMessage}
             </p>
           ) : null}
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Calendar className="size-4 text-amber-600" aria-hidden />
+              Google Kalender
+            </div>
+            {calStatus === null ? (
+              <p className="text-xs text-muted-foreground">Kalender-Status …</p>
+            ) : !calStatus.configured ? (
+              <p className="text-xs text-muted-foreground">
+                Google OAuth ist nicht konfiguriert:{" "}
+                <code className="rounded bg-muted px-1">GOOGLE_CLIENT_ID</code>,{" "}
+                <code className="rounded bg-muted px-1">GOOGLE_CLIENT_SECRET</code>{" "}
+                und{" "}
+                <code className="rounded bg-muted px-1">GOOGLE_OAUTH_REDIRECT_URI</code>{" "}
+                (oder <code className="rounded bg-muted px-1">NEXT_PUBLIC_SITE_URL</code>)
+                in <code className="rounded bg-muted px-1">.env.local</code> setzen — siehe
+                .env.example.
+              </p>
+            ) : !calStatus.loggedIn ? (
+              <p className="text-xs text-muted-foreground">
+                Für Kalender-Sync: oben anmelden (serverseitige Historie mit{" "}
+                <code className="rounded bg-muted px-1">DATABASE_URL</code> und{" "}
+                <code className="rounded bg-muted px-1">AUTH_SECRET</code>), dann Google
+                verbinden.
+              </p>
+            ) : !calStatus.connected ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={calBusy}
+                  onClick={() => {
+                    window.location.href = "/api/google-calendar/start";
+                  }}
+                >
+                  <Calendar className="size-4" aria-hidden />
+                  Google-Kalender verbinden
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Einmalig bei Google anmelden — nur Termine anlegen, kein voller Kalender-Zugriff
+                  nötig.
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <label className="flex min-w-[10rem] flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Start</span>
+                  <input
+                    type="datetime-local"
+                    value={calStartLocal}
+                    onChange={(e) => setCalStartLocal(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  />
+                </label>
+                <label className="flex w-[8rem] flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">Dauer (Min.)</span>
+                  <select
+                    value={calDurationMin}
+                    onChange={(e) => setCalDurationMin(Number(e.target.value))}
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    {[45, 60, 75, 90, 105, 120].map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={calBusy}
+                  onClick={() => void createCalendarEvent()}
+                >
+                  {calBusy ? "…" : "Termin anlegen"}
+                </Button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                  disabled={calBusy}
+                  onClick={() => void disconnectCalendar()}
+                >
+                  Google-Verbindung trennen
+                </button>
+              </div>
+            )}
+            {calMessage ? (
+              <p className="text-sm text-muted-foreground" aria-live="polite">
+                {calMessage}
+                {calEventLink ? (
+                  <>
+                    {" "}
+                    <a
+                      href={calEventLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      Im Kalender öffnen
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+
           {prescription.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Keine strukturierten Vorschläge — evtl. waren die Log-Daten zu

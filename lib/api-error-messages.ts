@@ -1,4 +1,4 @@
-export type ApiErrorContext = "analyze" | "replacement" | "pdf";
+export type ApiErrorContext = "analyze" | "replacement" | "pdf" | "calendar";
 
 /** Deutsche Kurztexte zu API-`code`-Werten für die UI. */
 export function userMessageForApiCode(
@@ -50,6 +50,9 @@ export function userMessageForApiCode(
     case "BAD_JSON":
       return "Ungültiges JSON in der Anfrage.";
     case "BAD_BODY":
+      if (meta?.context === "calendar") {
+        return "Ungültige Kalender-Daten. Bitte Zeiten prüfen und erneut versuchen.";
+      }
       if (meta?.context === "pdf") {
         return "Ungültige Daten für das Log-PDF. Bitte Ergebnis erneut laden und noch einmal versuchen.";
       }
@@ -59,6 +62,14 @@ export function userMessageForApiCode(
       return "Ungültige Anfragedaten.";
     case "PDF_BUILD":
       return "Das Log-PDF konnte nicht erzeugt werden. Bitte erneut versuchen.";
+    case "GOOGLE_OAUTH_NOT_CONFIGURED":
+      return "Google-Kalender ist auf dem Server nicht eingerichtet.";
+    case "GOOGLE_CALENDAR_NOT_CONNECTED":
+      return "Bitte zuerst „Google-Kalender verbinden“ ausführen.";
+    case "GOOGLE_CALENDAR_INSERT_FAILED":
+      return serverMessage || "Kalender-Eintrag fehlgeschlagen.";
+    case "UNAUTHORIZED":
+      return "Bitte zuerst anmelden.";
     default:
       return serverMessage || "Etwas ist schiefgelaufen.";
   }
