@@ -1,5 +1,6 @@
 import { workoutAnalysisResultSchema } from "@/lib/analysis-zod";
 import { buildWorkoutLogPdf } from "@/lib/build-workout-log-pdf";
+import { generateExerciseDescriptionsForPdf } from "@/lib/gemini-exercise-descriptions";
 import { generateTelegramPdfCaption } from "@/lib/gemini-telegram-caption";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { buildFallbackTelegramCaption } from "@/lib/telegram-caption-fallback";
@@ -14,6 +15,11 @@ export const runtime = "nodejs";
 /** Schnelles Modell für kurze Telegram-Captions; sonst GEMINI_MODEL. */
 const CAPTION_MODEL =
   process.env.GEMINI_TELEGRAM_CAPTION_MODEL?.trim() ||
+  process.env.GEMINI_MODEL?.trim() ||
+  "gemini-2.5-flash";
+
+const PDF_EXERCISE_DESC_MODEL =
+  process.env.GEMINI_PDF_EXERCISE_MODEL?.trim() ||
   process.env.GEMINI_MODEL?.trim() ||
   "gemini-2.5-flash";
 
@@ -56,9 +62,39 @@ export async function POST(request: Request) {
 
   const { result, sendTelegram, telegramGeminiCaption } = parsed.data;
 
+  const uniqueExerciseNames = [
+    ...new Set(
+      (result.next_session_prescription ?? [])
+        .map((x) => x.exercise_name.trim())
+        .filter((n) => n.length > 0 && n !== "—"),
+    ),
+  ];
+
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  let exerciseDescriptions: Awaited<
+    ReturnType<typeof generateExerciseDescriptionsForPdf>
+  > = [];
+  if (uniqueExerciseNames.length > 0 && geminiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      exerciseDescriptions = await generateExerciseDescriptionsForPdf(
+        ai,
+        PDF_EXERCISE_DESC_MODEL,
+        uniqueExerciseNames,
+      );
+    } catch {
+      exerciseDescriptions = uniqueExerciseNames.map((name) => ({ name, description: "" }));
+    }
+  } else if (uniqueExerciseNames.length > 0) {
+    exerciseDescriptions = uniqueExerciseNames.map((name) => ({ name, description: "" }));
+  }
+
   let pdfBytes: Uint8Array;
   try {
-    pdfBytes = await buildWorkoutLogPdf(result);
+    pdfBytes = await buildWorkoutLogPdf(result, {
+      exerciseDescriptions:
+        exerciseDescriptions.length > 0 ? exerciseDescriptions : undefined,
+    });
   } catch {
     return NextResponse.json(
       { error: "PDF-Erzeugung fehlgeschlagen", code: "PDF_BUILD" },
