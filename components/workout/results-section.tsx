@@ -23,7 +23,7 @@ import {
 import { userMessageForApiCode } from "@/lib/api-error-messages";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacement-panel";
-import { ClipboardList, FileDown } from "lucide-react";
+import { ChevronRight, ClipboardList, FileDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type SortKey = "date" | "name" | "sets" | "reps" | "weight";
@@ -39,6 +39,45 @@ function compareCell(a: TableRowT, b: TableRowT, key: SortKey, dir: SortDir): nu
     return mul * (na - nb);
   }
   return mul * String(va).localeCompare(String(vb), "de", { numeric: true });
+}
+
+/** Reihenfolge der Datum-Gruppen (ohne „—“ zuletzt). */
+function compareDateLabels(a: string, b: string): number {
+  if (a === "—" && b === "—") return 0;
+  if (a === "—") return 1;
+  if (b === "—") return -1;
+  return a.localeCompare(b, "de", { numeric: true });
+}
+
+function groupRowsByWorkoutDate(
+  rows: TableRowT[],
+  sortKey: SortKey | null,
+  sortDir: SortDir,
+): { date: string; rows: TableRowT[] }[] {
+  const map = new Map<string, TableRowT[]>();
+  const firstSeen: string[] = [];
+  for (const row of rows) {
+    const d = row.date || "—";
+    if (!map.has(d)) {
+      map.set(d, []);
+      firstSeen.push(d);
+    }
+    map.get(d)!.push(row);
+  }
+  if (sortKey) {
+    for (const list of map.values()) {
+      list.sort((a, b) => compareCell(a, b, sortKey, sortDir));
+    }
+  }
+  let order: string[];
+  if (sortKey === "date") {
+    order = [...map.keys()].sort((a, b) =>
+      compareDateLabels(a, b) * (sortDir === "asc" ? 1 : -1),
+    );
+  } else {
+    order = firstSeen;
+  }
+  return order.map((date) => ({ date, rows: map.get(date)! }));
 }
 
 type Props = {
@@ -88,17 +127,18 @@ export function ResultsSection({
 
   const filteredRows = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
-    let rows = q
+    return q
       ? tableRows.filter(
           (r) =>
             r.name.toLowerCase().includes(q) || r.date.toLowerCase().includes(q),
         )
       : tableRows;
-    if (sortKey) {
-      rows = [...rows].sort((a, b) => compareCell(a, b, sortKey, sortDir));
-    }
-    return rows;
-  }, [tableRows, filterQuery, sortKey, sortDir]);
+  }, [tableRows, filterQuery]);
+
+  const groupedByDate = useMemo(
+    () => groupRowsByWorkoutDate(filteredRows, sortKey, sortDir),
+    [filteredRows, sortKey, sortDir],
+  );
 
   const toggleSort = useCallback(
     (key: SortKey) => {
@@ -193,7 +233,7 @@ export function ResultsSection({
           <div>
             <CardTitle className="text-lg">Aus dem PDF erkannt</CardTitle>
             <CardDescription>
-              Extrahierte Zeilen — Grundlage für die nächste Session
+              Nach Workout-Tag gruppiert — Bereich ausklappen für alle Zeilen
             </CardDescription>
           </div>
           <input
@@ -211,119 +251,82 @@ export function ResultsSection({
               Keine Übungszeilen erkannt — evtl. war das PDF leer oder unleserlich.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="w-[1%] whitespace-nowrap"
-                    aria-sort={
-                      sortKey === "date"
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
+            <div className="space-y-4">
+              <div
+                role="toolbar"
+                aria-label="Sortierung der Zeilen innerhalb jedes Workout-Tags"
+                className="flex flex-wrap gap-x-4 gap-y-2 border-b border-border pb-3 text-sm"
+              >
+                {(
+                  [
+                    ["date", "Datum"],
+                    ["name", "Übung"],
+                    ["sets", "Sätze"],
+                    ["reps", "Wdh."],
+                    ["weight", "Gewicht"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+                    aria-pressed={sortKey === key}
+                    onClick={() => toggleSort(key)}
                   >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("date")}
+                    {label}{" "}
+                    <span className="text-xs opacity-70">{sortIndicator(key)}</span>
+                  </button>
+                ))}
+              </div>
+              {filteredRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Keine Zeilen passen zum Filter.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {groupedByDate.map(({ date, rows }) => (
+                    <details
+                      key={date}
+                      className="overflow-hidden rounded-lg border border-border bg-muted/20 [&[open]]:bg-muted/35"
                     >
-                      Datum <span className="text-xs opacity-70">{sortIndicator("date")}</span>
-                    </button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortKey === "name"
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("name")}
-                    >
-                      Übung <span className="text-xs opacity-70">{sortIndicator("name")}</span>
-                    </button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortKey === "sets"
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("sets")}
-                    >
-                      Sätze <span className="text-xs opacity-70">{sortIndicator("sets")}</span>
-                    </button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortKey === "reps"
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("reps")}
-                    >
-                      Wdh. <span className="text-xs opacity-70">{sortIndicator("reps")}</span>
-                    </button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortKey === "weight"
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 font-medium hover:text-foreground"
-                      onClick={() => toggleSort("weight")}
-                    >
-                      Gewicht <span className="text-xs opacity-70">{sortIndicator("weight")}</span>
-                    </button>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-muted-foreground">
-                      Keine Zeilen passen zum Filter.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRows.map((row, i) => (
-                    <TableRow key={`${row.date}-${row.name}-${i}`}>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        {row.date}
-                      </TableCell>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.sets}</TableCell>
-                      <TableCell>{row.reps}</TableCell>
-                      <TableCell>{row.weight}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+                        <ChevronRight
+                          aria-hidden
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
+                        <span className="tabular-nums">{date}</span>
+                        <span className="font-normal text-muted-foreground">
+                          ({rows.length}{" "}
+                          {rows.length === 1 ? "Übung" : "Übungen"})
+                        </span>
+                      </summary>
+                      <div className="border-t border-border px-2 pb-3 pt-1">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[1%]">Übung</TableHead>
+                              <TableHead>Sätze</TableHead>
+                              <TableHead>Wdh.</TableHead>
+                              <TableHead>Gewicht</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.map((row, i) => (
+                              <TableRow key={`${date}-${row.name}-${i}`}>
+                                <TableCell>{row.name}</TableCell>
+                                <TableCell>{row.sets}</TableCell>
+                                <TableCell>{row.reps}</TableCell>
+                                <TableCell>{row.weight}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
