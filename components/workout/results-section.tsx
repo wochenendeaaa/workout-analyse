@@ -147,7 +147,10 @@ export function ResultsSection({
       }
       const blob = await res.blob();
       const a = document.createElement("a");
-      const name = `training-log-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const nameHdr = res.headers.get("X-Log-Pdf-Filename");
+      const name = nameHdr
+        ? decodeURIComponent(nameHdr)
+        : `training-log-${new Date().toISOString().slice(0, 10)}.pdf`;
       a.href = URL.createObjectURL(blob);
       a.download = name;
       a.click();

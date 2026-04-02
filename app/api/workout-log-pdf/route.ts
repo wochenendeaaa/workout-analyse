@@ -1,15 +1,27 @@
 import { workoutAnalysisResultSchema } from "@/lib/analysis-zod";
 import { buildWorkoutLogPdf } from "@/lib/build-workout-log-pdf";
+import { generateTelegramPdfCaption } from "@/lib/gemini-telegram-caption";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { buildFallbackTelegramCaption } from "@/lib/telegram-caption-fallback";
 import { sendWorkoutPdfToTelegram } from "@/lib/telegram-send";
+import { buildWorkoutLogPdfFilename } from "@/lib/workout-log-filename";
+import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
+/** Schnelles Modell für kurze Telegram-Captions; sonst GEMINI_MODEL. */
+const CAPTION_MODEL =
+  process.env.GEMINI_TELEGRAM_CAPTION_MODEL?.trim() ||
+  process.env.GEMINI_MODEL?.trim() ||
+  "gemini-2.5-flash";
+
 const bodySchema = z.object({
   result: workoutAnalysisResultSchema,
   sendTelegram: z.boolean().optional(),
+  /** Wenn false: nur statische Caption (kein zusätzlicher Gemini-Call). Default: Gemini wenn GEMINI_API_KEY gesetzt. */
+  telegramGeminiCaption: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -42,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { result, sendTelegram } = parsed.data;
+  const { result, sendTelegram, telegramGeminiCaption } = parsed.data;
 
   let pdfBytes: Uint8Array;
   try {
@@ -54,12 +66,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const filename = `training-log-${new Date().toISOString().slice(0, 10)}.pdf`;
+  const filename = buildWorkoutLogPdfFilename();
 
   let telegramStatus: "sent" | "skipped" | "failed" = "skipped";
   let telegramErrorHeader: string | undefined;
   if (sendTelegram) {
-    const caption = `Workout-Log · ${new Date().toISOString().slice(0, 10)}`;
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const wantGemini =
+      telegramGeminiCaption !== false && Boolean(apiKey);
+    let caption = buildFallbackTelegramCaption(result);
+    if (wantGemini && apiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        caption = await generateTelegramPdfCaption(ai, CAPTION_MODEL, result);
+      } catch {
+        caption = buildFallbackTelegramCaption(result);
+      }
+    }
     const tg = await sendWorkoutPdfToTelegram(pdfBytes, filename, { caption });
     if (tg.ok) telegramStatus = "sent";
     else if (tg.reason === "not_configured") telegramStatus = "skipped";
@@ -71,7 +94,8 @@ export async function POST(request: Request) {
 
   const headers: Record<string, string> = {
     "Content-Type": "application/pdf",
-    "Content-Disposition": `attachment; filename="${filename}"`,
+    "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
+    "X-Log-Pdf-Filename": encodeURIComponent(filename),
     "X-Telegram-Status": telegramStatus,
     "Cache-Control": "no-store",
   };
