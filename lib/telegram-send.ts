@@ -1,3 +1,5 @@
+import { getTelegramEnv } from "@/lib/telegram-env";
+
 /**
  * Sendet ein PDF an den privaten Telegram-Bot-Chat (sendDocument).
  * Token und chat_id nur serverseitig setzen.
@@ -7,8 +9,7 @@ export async function sendWorkoutPdfToTelegram(
   filename: string,
   options?: { caption?: string },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+  const { token, chatId } = getTelegramEnv();
   if (!token || !chatId) {
     return { ok: false, reason: "not_configured" };
   }
@@ -38,6 +39,9 @@ export async function sendWorkoutPdfToTelegram(
       } catch {
         /* ignore */
       }
+    }
+    if (res.status === 401 || /unauthorized/i.test(detail)) {
+      detail = `${detail} — Token ungültig oder falsch (in Vercel ohne umschließende Anführungszeichen einfügen; ggf. neuen Token bei @BotFather).`;
     }
     return { ok: false, reason: detail };
   }
