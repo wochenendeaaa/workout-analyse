@@ -1,21 +1,25 @@
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 
-/** Kurze Caption ohne Gemini (Telegram-Limit 1024). */
+/** Kurze Coach-Stil-Caption ohne Gemini (Telegram-Limit 1024). */
 export function buildFallbackTelegramCaption(result: WorkoutAnalysisResult): string {
-  const n = result.next_session_prescription.length;
-  const names = result.next_session_prescription
-    .slice(0, 4)
-    .map((x) => x.exercise_name)
-    .filter(Boolean);
-  const tips = result.coach_tips.slice(0, 2).join(" · ");
-  const parts: string[] = [];
-  parts.push("Neues Trainings-Log-PDF");
-  if (n > 0) {
-    parts.push(
-      `Nächste Session: ${n} Übung${n === 1 ? "" : "en"}${names.length ? ` (${names.join(", ")}${n > 4 ? ", …" : ""})` : ""}.`,
+  const rx = result.next_session_prescription;
+  const first = rx[0];
+  const second = rx[1];
+  const bits: string[] = ["Hey Chef, hier dein neuer Workoutplan im PDF."];
+  if (first) {
+    bits.push(
+      `Bei ${first.exercise_name} zielst du auf ${first.suggested_weight || "die nächste Stufe"} (${first.target_sets}×${first.target_reps}).`,
+    );
+  } else if (result.progressive_overload_analysis.trim()) {
+    bits.push(
+      result.progressive_overload_analysis.replace(/\s+/g, " ").trim().slice(0, 140) +
+        (result.progressive_overload_analysis.length > 140 ? "…" : ""),
     );
   }
-  if (tips) parts.push(`Tipps: ${tips}`);
-  const s = parts.join(" ");
-  return s.length > 1000 ? `${s.slice(0, 997)}…` : s;
+  if (second) {
+    bits.push(`Und bei ${second.exercise_name}: ${second.suggested_weight || "Progression"}.`);
+  }
+  bits.push("Have Fun!");
+  const s = bits.join(" ");
+  return s.length > 420 ? `${s.slice(0, 417)}…` : s;
 }
