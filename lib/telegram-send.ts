@@ -5,6 +5,7 @@
 export async function sendWorkoutPdfToTelegram(
   pdfBytes: Uint8Array,
   filename: string,
+  options?: { caption?: string },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
@@ -16,6 +17,10 @@ export async function sendWorkoutPdfToTelegram(
   form.append("chat_id", chatId);
   const buf = Buffer.from(pdfBytes);
   form.append("document", new Blob([buf], { type: "application/pdf" }), filename);
+  const cap = options?.caption?.trim();
+  if (cap) {
+    form.append("caption", cap.slice(0, 1024));
+  }
 
   const res = await fetch(
     `https://api.telegram.org/bot${token}/sendDocument`,

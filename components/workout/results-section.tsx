@@ -24,7 +24,7 @@ import { userMessageForApiCode } from "@/lib/api-error-messages";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacement-panel";
 import { ClipboardList, FileDown } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type SortKey = "date" | "name" | "sets" | "reps" | "weight";
 type SortDir = "asc" | "desc";
@@ -58,10 +58,33 @@ export function ResultsSection({
   const [pdfLoading, setPdfLoading] = useState(false);
   const [sendTelegram, setSendTelegram] = useState(false);
   const [pdfMessage, setPdfMessage] = useState<string | null>(null);
+  const [telegramConfigured, setTelegramConfigured] = useState<boolean | null>(
+    null,
+  );
 
   const prescription = result.next_session_prescription ?? [];
 
   const tableRows = useMemo(() => buildTableRows(result), [result]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/telegram-config");
+        const data = (await res.json()) as { configured?: boolean };
+        if (!cancelled) {
+          const ok = data.configured === true;
+          setTelegramConfigured(ok);
+          if (!ok) setSendTelegram(false);
+        }
+      } catch {
+        if (!cancelled) setTelegramConfigured(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredRows = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
@@ -99,6 +122,7 @@ export function ResultsSection({
         body: JSON.stringify({ result, sendTelegram }),
       });
       const tg = res.headers.get("X-Telegram-Status");
+      const tgErrEnc = res.headers.get("X-Telegram-Error");
       if (!res.ok) {
         let errMsg = "Das Log-PDF konnte nicht erzeugt werden.";
         try {
@@ -131,9 +155,17 @@ export function ResultsSection({
       if (tg === "sent") {
         setPdfMessage("PDF wurde an Telegram (Bot-Chat) gesendet.");
       } else if (tg === "failed") {
-        setPdfMessage(
-          "PDF gespeichert — Telegram-Versand fehlgeschlagen (Token/Chat-ID prüfen).",
-        );
+        let detail =
+          "PDF gespeichert — Telegram-Versand fehlgeschlagen (Token/Chat-ID prüfen).";
+        if (tgErrEnc) {
+          try {
+            const dec = decodeURIComponent(tgErrEnc);
+            if (dec) detail = `PDF gespeichert — Telegram: ${dec}`;
+          } catch {
+            /* ignore */
+          }
+        }
+        setPdfMessage(detail);
       } else if (sendTelegram && tg === "skipped") {
         setPdfMessage(
           "PDF gespeichert — Telegram nicht konfiguriert (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID).",
@@ -319,17 +351,37 @@ export function ResultsSection({
               <FileDown className="size-4" aria-hidden />
               {pdfLoading ? "PDF …" : "Log-PDF (Druckvorlage)"}
             </Button>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <label
+              className={`flex items-center gap-2 text-sm ${
+                telegramConfigured === false
+                  ? "cursor-not-allowed text-muted-foreground/80"
+                  : "cursor-pointer text-muted-foreground"
+              }`}
+            >
               <input
                 type="checkbox"
                 className="size-4 rounded border-input accent-primary"
-                checked={sendTelegram}
+                checked={sendTelegram && telegramConfigured === true}
                 onChange={(e) => setSendTelegram(e.target.checked)}
-                disabled={pdfLoading}
+                disabled={
+                  pdfLoading ||
+                  telegramConfigured === false ||
+                  telegramConfigured === null
+                }
               />
               Zusätzlich per Telegram (Bot-Chat) senden
             </label>
           </div>
+          {telegramConfigured === false ? (
+            <p className="text-xs text-muted-foreground">
+              Telegram ist nicht konfiguriert: in{" "}
+              <code className="rounded bg-muted px-1">.env.local</code> (lokal) oder
+              in den Hosting-Umgebungsvariablen{" "}
+              <code className="rounded bg-muted px-1">TELEGRAM_BOT_TOKEN</code> und{" "}
+              <code className="rounded bg-muted px-1">TELEGRAM_CHAT_ID</code> setzen
+              — siehe README.
+            </p>
+          ) : null}
           {pdfMessage ? (
             <p className="text-sm text-muted-foreground" aria-live="polite">
               {pdfMessage}

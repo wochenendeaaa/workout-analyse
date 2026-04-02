@@ -15,7 +15,18 @@ cp .env.example .env.local
 
 `GEMINI_API_KEY` in `.env.local` setzen.
 
-Optional: `GEMINI_MODEL` (Standard im Code: `gemini-2.5-pro`), Upload-Limits (`MAX_PDF_MB`, `NEXT_PUBLIC_MAX_UPLOAD_MB`), Rate-Limit (`RATE_LIMIT_*`), Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), serverseitige Historie mit `DATABASE_URL` und `AUTH_SECRET` — siehe Kommentare in `.env.example`.
+Optional: `GEMINI_MODEL` (Standard im Code: `gemini-2.5-pro`), Upload-Limits (`MAX_PDF_MB`, `NEXT_PUBLIC_MAX_UPLOAD_MB`), Rate-Limit (`RATE_LIMIT_*`), [Telegram](#telegram-optional-log-pdf-per-bot), serverseitige Historie mit `DATABASE_URL` und `AUTH_SECRET` — siehe `.env.example`.
+
+### Telegram (optional, Log-PDF per Bot)
+
+1. In Telegram [**@BotFather**](https://t.me/BotFather) einen Bot anlegen und den **Token** kopieren.
+2. Den Bot einmal anschreiben und `/start` senden (privater Chat).
+3. **Chat-ID** ermitteln: z. B. `https://api.telegram.org/bot<DEIN_TOKEN>/getUpdates` im Browser öffnen (nach einer Nachricht an den Bot) und `chat.id` aus der JSON-Antwort lesen — oder Hilfs-Bots wie `@userinfobot` nutzen.
+4. In `.env.local` (lokal) bzw. in **Vercel → Environment Variables** setzen:
+   - `TELEGRAM_BOT_TOKEN` = Token vom BotFather  
+   - `TELEGRAM_CHAT_ID` = numerische Chat-ID (oft negativ bei Gruppen; bei dir meist eine positive Zahl im privaten Chat)
+
+Ohne beide Werte bleibt die Option „per Telegram senden“ in der App ausgegraut. Nach dem Setzen: Dev-Server neu starten bzw. auf Vercel **Redeploy**.
 
 ```bash
 npm install
@@ -67,7 +78,8 @@ Die App ist eine normale **Webapp** unter **HTTPS** — kein App Store nötig. K
 | `NEXT_PUBLIC_MAX_UPLOAD_MB` / `MAX_PDF_MB` | an Body-Limit des Hosts anpassen (Vercel oft 4 MB ohne Anpassung) |
 | `DATABASE_URL` | nur wenn du serverseitige Historie/Auth willst — siehe unten |
 | `AUTH_SECRET` | nur mit DB + Auth (mind. 32 Zeichen) |
-| Telegram, Rate-Limit | optional |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | optional — Log-PDF an Telegram; beide nötig |
+| Rate-Limit | optional |
 
 Nach dem Setzen: **Redeploy** auslösen, damit die Variablen greifen.
 

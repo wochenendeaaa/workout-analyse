@@ -57,20 +57,30 @@ export async function POST(request: Request) {
   const filename = `training-log-${new Date().toISOString().slice(0, 10)}.pdf`;
 
   let telegramStatus: "sent" | "skipped" | "failed" = "skipped";
+  let telegramErrorHeader: string | undefined;
   if (sendTelegram) {
-    const tg = await sendWorkoutPdfToTelegram(pdfBytes, filename);
+    const caption = `Workout-Log · ${new Date().toISOString().slice(0, 10)}`;
+    const tg = await sendWorkoutPdfToTelegram(pdfBytes, filename, { caption });
     if (tg.ok) telegramStatus = "sent";
     else if (tg.reason === "not_configured") telegramStatus = "skipped";
-    else telegramStatus = "failed";
+    else {
+      telegramStatus = "failed";
+      telegramErrorHeader = encodeURIComponent(tg.reason.slice(0, 400));
+    }
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="${filename}"`,
+    "X-Telegram-Status": telegramStatus,
+    "Cache-Control": "no-store",
+  };
+  if (telegramErrorHeader) {
+    headers["X-Telegram-Error"] = telegramErrorHeader;
   }
 
   return new NextResponse(Buffer.from(pdfBytes), {
     status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "X-Telegram-Status": telegramStatus,
-      "Cache-Control": "no-store",
-    },
+    headers,
   });
 }

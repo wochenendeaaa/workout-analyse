@@ -1,0 +1,14 @@
+---
+description: Nach Code-Änderungen an Commit/Push und Vercel erinnern
+alwaysApply: true
+---
+
+# Deploy-Workflow
+
+Wenn in diesem Projekt **Dateien geändert oder neu angelegt** wurden (nicht nur Fragen beantwortet):
+
+1. Am Ende der Antwort **kurz erinnern**: Änderungen mit Git nach GitHub bringen — `git add`, `git commit`, `git push` (Branch `main`). So triggert Vercel bei verbundenem Repo üblicherweise ein neues Deployment.
+2. Hinweis: **`.env.local`** wird nicht committed; neue Secrets nur in **Vercel → Environment Variables** setzen.
+3. Falls `git` im Terminal nicht gefunden wird: `"C:\Program Files\Git\cmd\git.exe"` nutzen oder neues Terminal / Git Bash.
+
+Formulierung knapp und freundlich, kein langes Tutorial, es sei denn der Nutzer fragt explizit.
