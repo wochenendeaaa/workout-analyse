@@ -30,7 +30,10 @@ import {
   ChevronRight,
   ClipboardList,
   FileDown,
+  Mic,
+  MicOff,
   MessageSquareQuote,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
@@ -142,6 +145,11 @@ export function ResultsSection({
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   const [refineBusy, setRefineBusy] = useState(false);
   const [refineMessage, setRefineMessage] = useState<string | null>(null);
+  const [followupModalOpen, setFollowupModalOpen] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [activeSpeechQuestionId, setActiveSpeechQuestionId] = useState<string | null>(
+    null,
+  );
 
   const prescription = result.next_session_prescription ?? [];
   const coachBigPicture = result.coach_big_picture;
@@ -220,6 +228,19 @@ export function ResultsSection({
       window.history.replaceState({}, "", `${u.pathname}${u.search}`);
     }
   }, [refreshCalStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const supported =
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window;
+    setSpeechSupported(supported);
+  }, []);
+
+  useEffect(() => {
+    if (coachFollowup?.required) {
+      setFollowupModalOpen(true);
+    }
+  }, [coachFollowup?.required]);
 
   const createCalendarEvent = useCallback(async () => {
     setCalMessage(null);
@@ -393,6 +414,39 @@ export function ResultsSection({
     setFollowupAnswers((prev) => ({ ...prev, [id]: value }));
   }, []);
 
+  const startSpeechForQuestion = useCallback(
+    (questionId: string) => {
+      if (typeof window === "undefined") return;
+      const SpeechCtor =
+        (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any })
+          .SpeechRecognition ??
+        (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any })
+          .webkitSpeechRecognition;
+      if (!SpeechCtor) return;
+      const rec = new SpeechCtor();
+      rec.lang = "de-DE";
+      rec.continuous = false;
+      rec.interimResults = false;
+      setActiveSpeechQuestionId(questionId);
+      rec.onresult = (event: any) => {
+        const txt = String(event?.results?.[0]?.[0]?.transcript ?? "").trim();
+        if (!txt) return;
+        setFollowupAnswers((prev) => ({
+          ...prev,
+          [questionId]: [prev[questionId] ?? "", txt].filter(Boolean).join(" "),
+        }));
+      };
+      rec.onend = () => {
+        setActiveSpeechQuestionId((curr) => (curr === questionId ? null : curr));
+      };
+      rec.onerror = () => {
+        setActiveSpeechQuestionId((curr) => (curr === questionId ? null : curr));
+      };
+      rec.start();
+    },
+    [],
+  );
+
   const refineWithCoachAnswers = useCallback(async () => {
     setRefineMessage(null);
     setRefineBusy(true);
@@ -458,13 +512,40 @@ export function ResultsSection({
       );
     }
     return (
-      <textarea
-        rows={2}
-        placeholder="Deine Antwort …"
-        value={followupAnswers[q.id] ?? ""}
-        onChange={(e) => setFollowupAnswer(q.id, e.target.value)}
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-      />
+      <div className="space-y-2">
+        <textarea
+          rows={2}
+          placeholder="Deine Antwort …"
+          value={followupAnswers[q.id] ?? ""}
+          onChange={(e) => setFollowupAnswer(q.id, e.target.value)}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        {speechSupported ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => startSpeechForQuestion(q.id)}
+            disabled={activeSpeechQuestionId !== null}
+          >
+            {activeSpeechQuestionId === q.id ? (
+              <>
+                <MicOff className="size-4" aria-hidden />
+                Aufnahme läuft…
+              </>
+            ) : (
+              <>
+                <Mic className="size-4" aria-hidden />
+                Sprechen (DE)
+              </>
+            )}
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Spracherkennung wird auf diesem Browser nicht unterstützt.
+          </p>
+        )}
+      </div>
     );
   };
 
@@ -686,30 +767,19 @@ export function ResultsSection({
                 Coach needs clarification
               </div>
               <p className="mb-3 text-sm text-muted-foreground">{coachFollowup.reason}</p>
-              <div className="space-y-3">
-                {coachFollowup.questions.map((q) => (
-                  <div key={q.id} className="space-y-1">
-                    <p className="text-sm text-foreground">{q.prompt}</p>
-                    {renderQuestionInput(q)}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center gap-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={refineBusy}
-                  onClick={() => void refineWithCoachAnswers()}
-                >
-                  {refineBusy ? "Coach …" : "Refine next session"}
-                </Button>
-                {refineMessage ? (
-                  <p className="text-sm text-muted-foreground" aria-live="polite">
-                    {refineMessage}
-                  </p>
-                ) : null}
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setFollowupModalOpen(true)}
+              >
+                Fragen öffnen
+              </Button>
+              {refineMessage ? (
+                <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">
+                  {refineMessage}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -912,6 +982,56 @@ export function ResultsSection({
         equipmentContextJson={equipmentContextJson}
         onAnalysisUpdate={onAnalysisUpdate}
       />
+
+      {coachFollowup?.required && followupModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border border-border bg-background p-4 shadow-xl">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Coach Clarifications</p>
+                <p className="text-sm text-muted-foreground">{coachFollowup.reason}</p>
+              </div>
+              <button
+                type="button"
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                onClick={() => setFollowupModalOpen(false)}
+                aria-label="Coach-Popup schließen"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {coachFollowup.questions.map((q) => (
+                <div key={q.id} className="space-y-1">
+                  <p className="text-sm text-foreground">{q.prompt}</p>
+                  {renderQuestionInput(q)}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={refineBusy}
+                onClick={() => void refineWithCoachAnswers()}
+              >
+                {refineBusy ? "Coach …" : "Refine next session"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setFollowupModalOpen(false)}
+              >
+                Später
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
