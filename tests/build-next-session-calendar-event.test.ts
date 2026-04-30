@@ -19,6 +19,7 @@ const sample: WorkoutAnalysisResult = {
       rationale: "Progression",
     },
   ],
+  coach_big_picture: null,
 };
 
 describe("buildNextSessionCalendarSummary", () => {

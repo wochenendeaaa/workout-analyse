@@ -65,6 +65,17 @@ export const WORKOUT_RESPONSE_JSON_SCHEMA = {
         ],
       },
     },
+    coach_big_picture: {
+      type: "object",
+      properties: {
+        headline: { type: "string" },
+        watch_outs: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+      required: ["headline", "watch_outs"],
+    },
   },
   required: [
     "extracted_data",
@@ -72,5 +83,6 @@ export const WORKOUT_RESPONSE_JSON_SCHEMA = {
     "coach_tips",
     "alternative_exercises",
     "next_session_prescription",
+    "coach_big_picture",
   ],
 } as const;

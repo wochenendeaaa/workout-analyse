@@ -25,6 +25,11 @@ export interface NextSessionPrescriptionItem {
   rationale: string;
 }
 
+export interface CoachBigPicture {
+  headline: string;
+  watch_outs: string[];
+}
+
 export interface WorkoutAnalysisResult {
   extracted_data: ExtractedDay[];
   progressive_overload_analysis: string;
@@ -32,4 +37,6 @@ export interface WorkoutAnalysisResult {
   alternative_exercises: AlternativeExercise[];
   /** Immer gesetzt nach neuer Analyse; bei importierten Alt-Daten ggf. leer. */
   next_session_prescription: NextSessionPrescriptionItem[];
+  /** Optional bei älteren Snapshots. */
+  coach_big_picture: CoachBigPicture | null;
 }

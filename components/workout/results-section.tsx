@@ -23,7 +23,13 @@ import {
 import { userMessageForApiCode } from "@/lib/api-error-messages";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacement-panel";
-import { Calendar, ChevronRight, ClipboardList, FileDown } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  ChevronRight,
+  ClipboardList,
+  FileDown,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 function defaultNextSessionLocal(): string {
@@ -120,6 +126,7 @@ export function ResultsSection({
   const [calBusy, setCalBusy] = useState(false);
 
   const prescription = result.next_session_prescription ?? [];
+  const coachBigPicture = result.coach_big_picture;
 
   const tableRows = useMemo(() => buildTableRows(result), [result]);
 
@@ -479,6 +486,23 @@ export function ResultsSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {coachBigPicture ? (
+            <div className="rounded-lg border border-amber-400/40 bg-amber-50/30 p-3 dark:bg-amber-900/10">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AlertCircle className="size-4 text-amber-600" aria-hidden />
+                Big-Picture Coach
+              </div>
+              <p className="text-sm text-foreground">{coachBigPicture.headline}</p>
+              {coachBigPicture.watch_outs.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                  {coachBigPicture.watch_outs.map((item, i) => (
+                    <li key={`${item}-${i}`}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           <div
             className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
             aria-busy={pdfLoading}

@@ -39,6 +39,11 @@ Das Feld alternative_exercises im JSON-Schema kannst du als leeres Array lassen 
 
 Aufgabe 4: Leite aus den extrahierten Daten und der Progressive-Overload-Analyse konkrete Vorschläge für die NÄCHSTE Trainingseinheit ab. Fülle das Array next_session_prescription: für jede betroffene Übung aus dem Log Einträge mit exercise_name, target_sets, target_reps (Zahl oder Spanne als Text, z.B. "8-10"), suggested_weight (z.B. "62,5 kg" oder "gleich wie letzte Session"), rationale (kurz: Progression, RPE, Deload, Technik). Nutze konservative Steigerungen; wenn unsicher, eher einen Bereich oder "unverändert" statt riskanter Sprünge. Wenn aus dem PDF nichts Sinnvolles ableitbar ist, gib ein leeres Array.
 
+Aufgabe 5: Erzeuge coach_big_picture als kompakten Meta-Block:
+- headline: 1 klarer Satz (max ~140 Zeichen), der den Gesamttrend der letzten Sessions zusammenfasst.
+- watch_outs: 2 bis 4 kurze Punkte mit Risiken/Fokus für die nächste Zeit (z. B. Technik, Ermüdung, Regeneration, Lastsprünge).
+- Keine Floskeln, konkret aus den Daten ableiten.
+
 Antwortformat: reines JSON ohne Markdown-Fences (das Ausgabe-Schema ist API-seitig fest vorgegeben).
 
 Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.`;

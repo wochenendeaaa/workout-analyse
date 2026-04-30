@@ -10,6 +10,7 @@ describe("workoutAnalysisResultSchema", () => {
       coach_tips: [],
       alternative_exercises: [],
       next_session_prescription: [],
+      coach_big_picture: null,
     };
     const out = workoutAnalysisResultSchema.safeParse(minimal);
     expect(out.success).toBe(true);
@@ -29,6 +30,7 @@ describe("workoutAnalysisResultSchema", () => {
     expect(out.success).toBe(true);
     if (out.success) {
       expect(out.data.next_session_prescription).toEqual([]);
+      expect(out.data.coach_big_picture).toBeNull();
     }
   });
 
@@ -49,6 +51,10 @@ describe("workoutAnalysisResultSchema", () => {
           rationale: "Progression",
         },
       ],
+      coach_big_picture: {
+        headline: "Stabile Progression bei Push, Unterkörper braucht Feinschliff.",
+        watch_outs: ["Kniebeuge-Tiefe konsistent halten", "Deload einplanen bei RPE-Spitze"],
+      },
     };
     expect(workoutAnalysisResultSchema.safeParse(row).success).toBe(true);
   });

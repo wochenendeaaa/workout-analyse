@@ -13,6 +13,15 @@ type Props = {
 export function HistoryBar({ entries, onRestore, onClearAll }: Props) {
   if (entries.length === 0) return null;
 
+  const latestDayLabel = (entry: StoredAnalysis): string | null => {
+    const list = entry.result.extracted_data ?? [];
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const d = list[i]?.date?.trim();
+      if (d) return d;
+    }
+    return null;
+  };
+
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2">
@@ -41,6 +50,7 @@ export function HistoryBar({ entries, onRestore, onClearAll }: Props) {
                 timeStyle: "short",
               })}{" "}
               — {h.fileName ?? "Ohne Dateiname"}
+              {latestDayLabel(h) ? ` · Log: ${latestDayLabel(h)}` : ""}
               {h.id.startsWith("db-") ? " (Server)" : ""}
             </option>
           ))}

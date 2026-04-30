@@ -20,6 +20,11 @@ const nextSessionPrescriptionItemSchema = z.object({
   rationale: z.string(),
 });
 
+const coachBigPictureSchema = z.object({
+  headline: z.string(),
+  watch_outs: z.array(z.string()),
+});
+
 export const workoutAnalysisResultSchema = z.object({
   extracted_data: z.array(extractedDaySchema),
   progressive_overload_analysis: z.string(),
@@ -35,6 +40,8 @@ export const workoutAnalysisResultSchema = z.object({
   next_session_prescription: z
     .array(nextSessionPrescriptionItemSchema)
     .default([]),
+  /** Optional bei älteren gespeicherten Snapshots. */
+  coach_big_picture: coachBigPictureSchema.nullable().default(null),
 });
 
 export type WorkoutAnalysisParsed = z.infer<typeof workoutAnalysisResultSchema>;

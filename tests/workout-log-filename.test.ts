@@ -7,7 +7,7 @@ describe("buildWorkoutLogPdfFilename", () => {
     const d = new Date("2026-04-02T12:00:00.000Z");
     const name = buildWorkoutLogPdfFilename(d);
     expect(name.endsWith(".pdf")).toBe(true);
-    expect(name).toMatch(/^New-Trainingplan-starting-/);
-    expect(name).toContain("2026");
+    expect(name).toMatch(/^workout-log-\d{4}-\d{2}-\d{2}\.pdf$/);
+    expect(name).toContain("2026-");
   });
 });

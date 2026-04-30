@@ -3,7 +3,10 @@ import { buildWorkoutLogPdf } from "@/lib/build-workout-log-pdf";
 import { generateExerciseDescriptionsForPdf } from "@/lib/gemini-exercise-descriptions";
 import { generateTelegramPdfCaption } from "@/lib/gemini-telegram-caption";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { buildFallbackTelegramCaption } from "@/lib/telegram-caption-fallback";
+import {
+  buildFallbackTelegramCaption,
+  withTelegramFilenameHint,
+} from "@/lib/telegram-caption-fallback";
 import { sendWorkoutPdfToTelegram } from "@/lib/telegram-send";
 import { buildWorkoutLogPdfFilename } from "@/lib/workout-log-filename";
 import { GoogleGenAI } from "@google/genai";
@@ -119,6 +122,7 @@ export async function POST(request: Request) {
         caption = buildFallbackTelegramCaption(result);
       }
     }
+    caption = withTelegramFilenameHint(caption, filename);
     const tg = await sendWorkoutPdfToTelegram(pdfBytes, filename, { caption });
     if (tg.ok) telegramStatus = "sent";
     else if (tg.reason === "not_configured") telegramStatus = "skipped";

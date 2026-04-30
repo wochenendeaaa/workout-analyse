@@ -24,6 +24,7 @@ const baseResult = (): WorkoutAnalysisResult => ({
       rationale: "Kraft",
     },
   ],
+  coach_big_picture: null,
 });
 
 describe("applyExerciseReplacementInPrescription", () => {

@@ -23,3 +23,9 @@ export function buildFallbackTelegramCaption(result: WorkoutAnalysisResult): str
   const s = bits.join(" ");
   return s.length > 420 ? `${s.slice(0, 417)}…` : s;
 }
+
+export function withTelegramFilenameHint(caption: string, filename: string): string {
+  const hint = `Dateiname: ${filename}`;
+  const merged = `${hint}\n${caption}`.trim();
+  return merged.length > 1024 ? `${merged.slice(0, 1021)}…` : merged;
+}
