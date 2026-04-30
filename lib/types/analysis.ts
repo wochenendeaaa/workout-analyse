@@ -66,6 +66,25 @@ export interface CoachMemoryLocal {
   last_updated_at: string;
 }
 
+export interface PostWorkoutDebrief {
+  session_effort_1_10: number | null;
+  pain_notes: string;
+  recovery_flags: string;
+  free_note: string;
+}
+
+export type TomorrowPlanStatus =
+  | "as_planned"
+  | "light_adjustment"
+  | "deload_signal";
+
+export interface TomorrowPlan {
+  status: TomorrowPlanStatus;
+  summary: string;
+  top_priorities: string[];
+  caution_flags: string[];
+}
+
 export interface WorkoutAnalysisResult {
   extracted_data: ExtractedDay[];
   progressive_overload_analysis: string;
@@ -77,4 +96,8 @@ export interface WorkoutAnalysisResult {
   coach_big_picture: CoachBigPicture | null;
   /** Optional bei älteren gespeicherten Snapshots. */
   coach_followup: CoachFollowup | null;
+  /** Optional bei älteren gespeicherten Snapshots. */
+  post_workout_debrief: PostWorkoutDebrief | null;
+  /** Optional bei älteren gespeicherten Snapshots. */
+  tomorrow_plan: TomorrowPlan | null;
 }

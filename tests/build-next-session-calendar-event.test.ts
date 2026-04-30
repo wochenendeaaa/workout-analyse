@@ -21,6 +21,8 @@ const sample: WorkoutAnalysisResult = {
   ],
   coach_big_picture: null,
   coach_followup: null,
+  post_workout_debrief: null,
+  tomorrow_plan: null,
 };
 
 describe("buildNextSessionCalendarSummary", () => {

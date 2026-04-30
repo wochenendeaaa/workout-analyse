@@ -38,6 +38,20 @@ const coachFollowupSchema = z.object({
   questions: z.array(coachFollowupQuestionSchema).max(4).default([]),
 });
 
+const postWorkoutDebriefSchema = z.object({
+  session_effort_1_10: z.number().int().min(1).max(10).nullable().default(null),
+  pain_notes: z.string().default(""),
+  recovery_flags: z.string().default(""),
+  free_note: z.string().default(""),
+});
+
+const tomorrowPlanSchema = z.object({
+  status: z.enum(["as_planned", "light_adjustment", "deload_signal"]),
+  summary: z.string(),
+  top_priorities: z.array(z.string()).default([]),
+  caution_flags: z.array(z.string()).default([]),
+});
+
 export const workoutAnalysisResultSchema = z.object({
   extracted_data: z.array(extractedDaySchema),
   progressive_overload_analysis: z.string(),
@@ -57,6 +71,10 @@ export const workoutAnalysisResultSchema = z.object({
   coach_big_picture: coachBigPictureSchema.nullable().default(null),
   /** Optional bei älteren gespeicherten Snapshots. */
   coach_followup: coachFollowupSchema.nullable().default(null),
+  /** Optional bei älteren gespeicherten Snapshots. */
+  post_workout_debrief: postWorkoutDebriefSchema.nullable().default(null),
+  /** Optional bei älteren gespeicherten Snapshots. */
+  tomorrow_plan: tomorrowPlanSchema.nullable().default(null),
 });
 
 export type WorkoutAnalysisParsed = z.infer<typeof workoutAnalysisResultSchema>;
@@ -73,6 +91,8 @@ export const coachRefineAnswerSchema = z.object({
   question_id: z.string(),
   answer: z.string(),
 });
+
+export const postWorkoutDebriefInputSchema = postWorkoutDebriefSchema;
 
 export const coachTrendStatsSchema = z.object({
   total_sessions_seen: z.number().int().min(0).default(0),

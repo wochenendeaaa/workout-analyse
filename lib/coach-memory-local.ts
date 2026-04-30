@@ -7,6 +7,7 @@ import type {
   CoachMemoryLocal,
   CoachProfileLocal,
   ExtractedDay,
+  PostWorkoutDebrief,
 } from "@/lib/types/analysis";
 import { z } from "zod";
 
@@ -101,9 +102,10 @@ function dedupeDay(day: ExtractedDay): ExtractedDay {
 export function ingestSessionsIntoCoachMemory(
   prev: CoachMemoryLocal,
   incoming: ExtractedDay[],
+  debrief?: PostWorkoutDebrief | null,
 ): CoachMemoryLocal {
   const cleanIncoming = incoming.map(dedupeDay);
-  if (cleanIncoming.length === 0) return prev;
+  if (cleanIncoming.length === 0 && !debrief) return prev;
 
   const mergedRecent = [...prev.recent_sessions, ...cleanIncoming];
   const overflowCount = Math.max(0, mergedRecent.length - MAX_RECENT_MEMORY_SESSIONS);
@@ -112,9 +114,15 @@ export function ingestSessionsIntoCoachMemory(
     overflowCount > 0 ? mergedRecent.slice(overflowCount) : mergedRecent;
 
   const summaryAdd = summarizeDays(overflow);
+  const debriefAdd = debrief
+    ? `Debrief: Effort ${debrief.session_effort_1_10 ?? "?"}/10; Pain: ${
+        debrief.pain_notes || "-"
+      }; Recovery: ${debrief.recovery_flags || "-"}; Note: ${debrief.free_note || "-"}`
+    : "";
   const long_term_summary = [prev.long_term_summary.trim(), summaryAdd.trim()]
     .filter(Boolean)
     .join(" || ")
+    .concat(debriefAdd ? ` || ${debriefAdd}` : "")
     .slice(-5000);
 
   const allForStats = [...recent_sessions, ...overflow];

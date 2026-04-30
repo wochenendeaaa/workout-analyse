@@ -159,6 +159,20 @@ export function ResultsSection({
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   const [refineBusy, setRefineBusy] = useState(false);
   const [refineMessage, setRefineMessage] = useState<string | null>(null);
+  const [debriefEffort, setDebriefEffort] = useState<string>(
+    result.post_workout_debrief?.session_effort_1_10
+      ? String(result.post_workout_debrief.session_effort_1_10)
+      : "",
+  );
+  const [debriefPain, setDebriefPain] = useState(
+    result.post_workout_debrief?.pain_notes ?? "",
+  );
+  const [debriefRecovery, setDebriefRecovery] = useState(
+    result.post_workout_debrief?.recovery_flags ?? "",
+  );
+  const [debriefNote, setDebriefNote] = useState(
+    result.post_workout_debrief?.free_note ?? "",
+  );
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [activeSpeechQuestionId, setActiveSpeechQuestionId] = useState<string | null>(
@@ -168,6 +182,7 @@ export function ResultsSection({
   const prescription = result.next_session_prescription ?? [];
   const coachBigPicture = result.coach_big_picture;
   const coachFollowup = result.coach_followup;
+  const tomorrowPlan = result.tomorrow_plan;
 
   const tableRows = useMemo(() => buildTableRows(result), [result]);
 
@@ -255,6 +270,17 @@ export function ResultsSection({
       setFollowupModalOpen(true);
     }
   }, [coachFollowup?.required]);
+
+  useEffect(() => {
+    setDebriefEffort(
+      result.post_workout_debrief?.session_effort_1_10
+        ? String(result.post_workout_debrief.session_effort_1_10)
+        : "",
+    );
+    setDebriefPain(result.post_workout_debrief?.pain_notes ?? "");
+    setDebriefRecovery(result.post_workout_debrief?.recovery_flags ?? "");
+    setDebriefNote(result.post_workout_debrief?.free_note ?? "");
+  }, [result.post_workout_debrief]);
 
   const createCalendarEvent = useCallback(async () => {
     setCalMessage(null);
@@ -451,6 +477,10 @@ export function ResultsSection({
       rec.onresult = (event) => {
         const txt = String(event?.results?.[0]?.[0]?.transcript ?? "").trim();
         if (!txt) return;
+        if (questionId === "__debrief_note__") {
+          setDebriefNote((prev) => [prev, txt].filter(Boolean).join(" ").trim());
+          return;
+        }
         setFollowupAnswers((prev) => ({
           ...prev,
           [questionId]: [prev[questionId] ?? "", txt].filter(Boolean).join(" "),
@@ -474,6 +504,7 @@ export function ResultsSection({
       const answers = Object.entries(followupAnswers)
         .map(([question_id, answer]) => ({ question_id, answer: answer.trim() }))
         .filter((x) => x.answer.length > 0);
+      const effortNum = Number.parseInt(debriefEffort, 10);
       const res = await fetch("/api/coach-refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -482,6 +513,15 @@ export function ResultsSection({
           answers,
           coachProfile,
           coachMemory,
+          postWorkoutDebrief: {
+            session_effort_1_10:
+              debriefEffort.trim() === "" || !Number.isFinite(effortNum)
+                ? null
+                : effortNum,
+            pain_notes: debriefPain.trim(),
+            recovery_flags: debriefRecovery.trim(),
+            free_note: debriefNote.trim(),
+          },
         }),
       });
       const json = (await res.json()) as WorkoutAnalysisResult | { error?: string; code?: string };
@@ -499,7 +539,17 @@ export function ResultsSection({
     } finally {
       setRefineBusy(false);
     }
-  }, [coachMemory, coachProfile, followupAnswers, onAnalysisUpdate, result]);
+  }, [
+    coachMemory,
+    coachProfile,
+    debriefEffort,
+    debriefNote,
+    debriefPain,
+    debriefRecovery,
+    followupAnswers,
+    onAnalysisUpdate,
+    result,
+  ]);
 
   const renderQuestionInput = (q: CoachFollowupQuestion) => {
     if (q.kind === "choice") {
@@ -769,6 +819,35 @@ export function ResultsSection({
             </button>
           </div>
 
+          {tomorrowPlan ? (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AlertCircle className="size-4 text-primary" aria-hidden />
+                Tomorrow Plan
+              </div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {tomorrowPlan.status === "as_planned"
+                  ? "As planned"
+                  : tomorrowPlan.status === "light_adjustment"
+                    ? "Light adjustment"
+                    : "Deload signal"}
+              </p>
+              <p className="mt-1 text-sm text-foreground">{tomorrowPlan.summary}</p>
+              {tomorrowPlan.top_priorities.length > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                  {tomorrowPlan.top_priorities.map((item, i) => (
+                    <li key={`${item}-${i}`}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {tomorrowPlan.caution_flags.length > 0 ? (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Achtung: {tomorrowPlan.caution_flags.join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           {coachBigPicture ? (
             <div className="rounded-lg border border-amber-400/40 bg-amber-50/20 p-3 dark:bg-amber-900/10">
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -785,6 +864,75 @@ export function ResultsSection({
               ) : null}
             </div>
           ) : null}
+
+          <div className="rounded-lg border border-border/80 bg-muted/10 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <MessageSquareQuote className="size-4 text-primary" aria-hidden />
+              Post-Workout Debrief
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Effort (1-10)
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={debriefEffort}
+                  onChange={(e) => setDebriefEffort(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Recovery flag
+                <input
+                  value={debriefRecovery}
+                  onChange={(e) => setDebriefRecovery(e.target.value)}
+                  placeholder="z. B. schlechter Schlaf"
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+            </div>
+            <label className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+              Pain / discomfort
+              <input
+                value={debriefPain}
+                onChange={(e) => setDebriefPain(e.target.value)}
+                placeholder="Kurz notieren…"
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+              />
+            </label>
+            <label className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
+              Optional note
+              <textarea
+                rows={2}
+                value={debriefNote}
+                onChange={(e) => setDebriefNote(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {speechSupported ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startSpeechForQuestion("__debrief_note__")}
+                  disabled={activeSpeechQuestionId !== null}
+                >
+                  <Mic className="size-4" aria-hidden />
+                  Voice note (DE)
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void refineWithCoachAnswers()}
+                disabled={refineBusy}
+              >
+                {refineBusy ? "Updating…" : "Update tomorrow plan"}
+              </Button>
+            </div>
+          </div>
 
           {coachFollowup?.required ? (
             <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">

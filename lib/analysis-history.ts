@@ -52,6 +52,21 @@ export function appendHistory(
   localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
 }
 
+export function replaceLatestHistoryResult(
+  fileName: string | null,
+  result: WorkoutAnalysisResult,
+): void {
+  if (typeof window === "undefined") return;
+  const items = loadHistory();
+  if (items.length === 0) {
+    appendHistory(fileName, result);
+    return;
+  }
+  const [latest, ...rest] = items;
+  const next = [{ ...latest, fileName, result, savedAt: new Date().toISOString() }, ...rest];
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(0, MAX_HISTORY)));
+}
+
 export function clearHistory(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(HISTORY_KEY);

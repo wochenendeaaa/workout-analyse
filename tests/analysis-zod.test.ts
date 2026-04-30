@@ -12,6 +12,8 @@ describe("workoutAnalysisResultSchema", () => {
       next_session_prescription: [],
       coach_big_picture: null,
       coach_followup: null,
+      post_workout_debrief: null,
+      tomorrow_plan: null,
     };
     const out = workoutAnalysisResultSchema.safeParse(minimal);
     expect(out.success).toBe(true);
@@ -33,6 +35,8 @@ describe("workoutAnalysisResultSchema", () => {
       expect(out.data.next_session_prescription).toEqual([]);
       expect(out.data.coach_big_picture).toBeNull();
       expect(out.data.coach_followup).toBeNull();
+      expect(out.data.post_workout_debrief).toBeNull();
+      expect(out.data.tomorrow_plan).toBeNull();
     }
   });
 
@@ -63,6 +67,13 @@ describe("workoutAnalysisResultSchema", () => {
         questions: [
           { id: "rpe", prompt: "Wie schwer fühlte es sich an?", kind: "scale" },
         ],
+      },
+      post_workout_debrief: null,
+      tomorrow_plan: {
+        status: "light_adjustment",
+        summary: "Morgen mit leicht reduzierter Last starten.",
+        top_priorities: ["Technik vor Last", "RPE <= 8 halten"],
+        caution_flags: ["Bei Schmerz sofort abbrechen"],
       },
     };
     expect(workoutAnalysisResultSchema.safeParse(row).success).toBe(true);

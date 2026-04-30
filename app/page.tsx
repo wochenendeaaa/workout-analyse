@@ -11,6 +11,7 @@ import {
   clearSessionSnapshot,
   loadHistory,
   loadSessionSnapshot,
+  replaceLatestHistoryResult,
   saveSessionSnapshot,
   type StoredAnalysis,
 } from "@/lib/analysis-history";
@@ -239,11 +240,16 @@ export default function Home() {
   const updateAnalysisResult = useCallback(
     (next: WorkoutAnalysisResult) => {
       setResult(next);
+      setCoachMemory((prev) =>
+        ingestSessionsIntoCoachMemory(prev, [], next.post_workout_debrief),
+      );
       if (fileName) {
+        replaceLatestHistoryResult(fileName, next);
         saveSessionSnapshot(fileName, next);
       }
+      void refreshMergedHistory();
     },
-    [fileName],
+    [fileName, refreshMergedHistory],
   );
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

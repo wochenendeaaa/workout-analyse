@@ -100,6 +100,31 @@ export const WORKOUT_RESPONSE_JSON_SCHEMA = {
       },
       required: ["required", "reason", "questions"],
     },
+    post_workout_debrief: {
+      type: "object",
+      properties: {
+        session_effort_1_10: { type: "number" },
+        pain_notes: { type: "string" },
+        recovery_flags: { type: "string" },
+        free_note: { type: "string" },
+      },
+      required: [
+        "session_effort_1_10",
+        "pain_notes",
+        "recovery_flags",
+        "free_note",
+      ],
+    },
+    tomorrow_plan: {
+      type: "object",
+      properties: {
+        status: { type: "string" },
+        summary: { type: "string" },
+        top_priorities: { type: "array", items: { type: "string" } },
+        caution_flags: { type: "array", items: { type: "string" } },
+      },
+      required: ["status", "summary", "top_priorities", "caution_flags"],
+    },
   },
   required: [
     "extracted_data",
@@ -109,5 +134,7 @@ export const WORKOUT_RESPONSE_JSON_SCHEMA = {
     "next_session_prescription",
     "coach_big_picture",
     "coach_followup",
+    "post_workout_debrief",
+    "tomorrow_plan",
   ],
 } as const;

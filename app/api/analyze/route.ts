@@ -60,6 +60,14 @@ Aufgabe 6: Erzeuge coach_followup:
   - choice: mit 2-5 kurzen choices
 - Keine redundanten Fragen, wenn Kontext schon vorhanden ist.
 
+Aufgabe 7: Fülle post_workout_debrief im Erstlauf standardmäßig mit null (wird nach Upload per User-Debrief gesetzt).
+
+Aufgabe 8: Erzeuge tomorrow_plan auch ohne Debrief:
+- status: "as_planned" oder "light_adjustment" je nach Risiko.
+- summary: 1 klarer Satz für die nächste Session.
+- top_priorities: 2-3 konkrete Fokuspunkte.
+- caution_flags: 0-3 kurze Warnhinweise.
+
 Antwortformat: reines JSON ohne Markdown-Fences (das Ausgabe-Schema ist API-seitig fest vorgegeben).
 
 Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.`;
