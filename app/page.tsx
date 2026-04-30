@@ -38,6 +38,7 @@ import type {
   CoachProfileLocal,
   WorkoutAnalysisResult,
 } from "@/lib/types/analysis";
+import { SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const MAX_CLIENT_BYTES = getClientMaxPdfBytes();
@@ -266,32 +267,41 @@ export default function Home() {
       >
         Zum Inhalt springen
       </a>
-      <header className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
-        <div className="mb-10 text-center sm:text-left">
-          <p className="mb-1 text-sm font-medium text-primary">Workout-Analyse</p>
-          <p className="text-sm text-muted-foreground">Persönlich · Handschrift-PDF</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+      <header className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
+        <div className="mb-8 text-center sm:text-left">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary/90">
+            Workout Coach
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Trainingsplan aus PDF verstehen
           </h1>
-          <p className="mt-2 max-w-2xl text-muted-foreground">
-            PDF hochladen → nächste Session planen, Log-PDF erzeugen, bei Bedarf
-            einzelne Übungen ersetzen.
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Upload, Coach-Insight, nächste Session.
           </p>
         </div>
       </header>
 
       <main id="content" className="mx-auto min-h-screen max-w-5xl px-4 pb-10 sm:px-6">
-      <AuthBar className="mb-8" onAuthChange={() => void refreshMergedHistory()} />
-
-      <EquipmentContextCard
-        value={equipment}
-        onChange={setEquipment}
-        disabled={loading}
-      />
+      <details className="mb-5 rounded-lg border border-border/80 bg-muted/10 p-3">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+          <SlidersHorizontal className="size-4 text-muted-foreground" />
+          Mehr Einstellungen
+        </summary>
+        <div className="mt-3 space-y-4">
+          <AuthBar className="mb-0" onAuthChange={() => void refreshMergedHistory()} />
+          <EquipmentContextCard
+            value={equipment}
+            onChange={setEquipment}
+            disabled={loading}
+            compact
+          />
+        </div>
+      </details>
 
       <UploadSection
         maxClientMb={MAX_CLIENT_MB}
         vercelHint={MAX_CLIENT_MB <= 4}
+        compact
         loading={loading}
         error={error}
         fileName={fileName}
@@ -312,6 +322,7 @@ export default function Home() {
         <ResultsSection
           result={result}
           equipmentContextJson={stringifyEquipmentPayload(equipment)}
+          compact
           coachProfile={coachProfile}
           coachMemory={coachMemory}
           onCoachProfileChange={setCoachProfile}

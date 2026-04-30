@@ -16,9 +16,10 @@ type Props = {
   value: EquipmentContextPayload;
   onChange: (next: EquipmentContextPayload) => void;
   disabled?: boolean;
+  compact?: boolean;
 };
 
-export function EquipmentContextCard({ value, onChange, disabled }: Props) {
+export function EquipmentContextCard({ value, onChange, disabled, compact }: Props) {
   const selected = new Set(value.presetIds ?? []);
 
   function toggle(id: string) {
@@ -29,16 +30,16 @@ export function EquipmentContextCard({ value, onChange, disabled }: Props) {
   }
 
   return (
-    <Card className="mb-10">
+    <Card className={compact ? "mb-0" : "mb-10"}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Dumbbell className="size-5 text-primary" />
           Deine Ausstattung
         </CardTitle>
         <CardDescription>
-          Wähle, was du zuhause oder im Gym hast. Tipps und Alternativübungen
-          richten sich danach (z.&nbsp;B. Gewichtsbereich bei Kurzhanteln unten
-          ergänzen).
+          {compact
+            ? "Optional: beeinflusst Empfehlungen."
+            : "Wähle, was du zuhause oder im Gym hast. Tipps und Alternativübungen richten sich danach."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

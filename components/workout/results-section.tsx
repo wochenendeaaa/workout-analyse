@@ -42,6 +42,18 @@ import type {
   CoachFollowupQuestion,
 } from "@/lib/types/analysis";
 
+type SpeechCtorLike = {
+  new (): {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    onresult: ((event: { results?: { 0?: { 0?: { transcript?: string } } } }) => void) | null;
+    onend: (() => void) | null;
+    onerror: (() => void) | null;
+    start: () => void;
+  };
+};
+
 function defaultNextSessionLocal(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -106,6 +118,7 @@ function groupRowsByWorkoutDate(
 
 type Props = {
   result: WorkoutAnalysisResult;
+  compact?: boolean;
   equipmentContextJson: string;
   coachProfile: CoachProfileLocal;
   coachMemory: CoachMemoryLocal;
@@ -116,6 +129,7 @@ type Props = {
 
 export function ResultsSection({
   result,
+  compact,
   equipmentContextJson,
   coachProfile,
   coachMemory,
@@ -418,9 +432,15 @@ export function ResultsSection({
     (questionId: string) => {
       if (typeof window === "undefined") return;
       const SpeechCtor =
-        (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any })
+        (window as Window & {
+          SpeechRecognition?: SpeechCtorLike;
+          webkitSpeechRecognition?: SpeechCtorLike;
+        })
           .SpeechRecognition ??
-        (window as Window & { SpeechRecognition?: any; webkitSpeechRecognition?: any })
+        (window as Window & {
+          SpeechRecognition?: SpeechCtorLike;
+          webkitSpeechRecognition?: SpeechCtorLike;
+        })
           .webkitSpeechRecognition;
       if (!SpeechCtor) return;
       const rec = new SpeechCtor();
@@ -428,7 +448,7 @@ export function ResultsSection({
       rec.continuous = false;
       rec.interimResults = false;
       setActiveSpeechQuestionId(questionId);
-      rec.onresult = (event: any) => {
+      rec.onresult = (event) => {
         const txt = String(event?.results?.[0]?.[0]?.transcript ?? "").trim();
         if (!txt) return;
         setFollowupAnswers((prev) => ({
@@ -550,7 +570,8 @@ export function ResultsSection({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {!compact ? (
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -653,19 +674,24 @@ export function ResultsSection({
           )}
         </CardContent>
       </Card>
+      ) : null}
 
-      <Card className="border-l-4 border-l-amber-600">
+      <Card className="border-l-4 border-l-amber-600/80 border-border/80">
         <CardHeader>
           <div className="flex items-center gap-2">
             <ClipboardList className="size-5 text-amber-600" />
             <CardTitle className="text-lg">Nächste Session</CardTitle>
           </div>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Vorschlag für Sätze, Wdh. und Gewicht — Coach-Tipps stehen im Log-PDF.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+        <CardContent className="space-y-3">
+          <div
+            className={`rounded-lg border border-border bg-muted/20 p-3 ${
+              compact ? "hidden" : ""
+            }`}
+          >
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
               <Brain className="size-4 text-primary" aria-hidden />
               Coach Memory (lokal)
@@ -744,7 +770,7 @@ export function ResultsSection({
           </div>
 
           {coachBigPicture ? (
-            <div className="rounded-lg border border-amber-400/40 bg-amber-50/30 p-3 dark:bg-amber-900/10">
+            <div className="rounded-lg border border-amber-400/40 bg-amber-50/20 p-3 dark:bg-amber-900/10">
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <AlertCircle className="size-4 text-amber-600" aria-hidden />
                 Big-Picture Coach
@@ -796,50 +822,87 @@ export function ResultsSection({
               onClick={() => void downloadLogPdf()}
             >
               <FileDown className="size-4" aria-hidden />
-              {pdfLoading ? "PDF …" : "Log-PDF (Druckvorlage)"}
+              {pdfLoading ? "PDF …" : "Log-PDF"}
             </Button>
-            <label
-              className={`flex items-center gap-2 text-sm ${
-                telegramConfigured === false
-                  ? "cursor-not-allowed text-muted-foreground/80"
-                  : "cursor-pointer text-muted-foreground"
-              }`}
-            >
-              <input
-                type="checkbox"
-                className="size-4 rounded border-input accent-primary"
-                checked={sendTelegram && telegramConfigured === true}
-                onChange={(e) => setSendTelegram(e.target.checked)}
-                disabled={
-                  pdfLoading ||
-                  telegramConfigured === false ||
-                  telegramConfigured === null
-                }
-              />
-              Zusätzlich per Telegram (Bot-Chat) senden
-            </label>
           </div>
-          {telegramConfigured === false ? (
-            <p className="text-xs text-muted-foreground">
-              Telegram ist nicht konfiguriert: in{" "}
-              <code className="rounded bg-muted px-1">.env.local</code> (lokal) oder
-              in den Hosting-Umgebungsvariablen{" "}
-              <code className="rounded bg-muted px-1">TELEGRAM_BOT_TOKEN</code> und{" "}
-              <code className="rounded bg-muted px-1">TELEGRAM_CHAT_ID</code> setzen
-              — siehe README.
-            </p>
-          ) : null}
           {pdfMessage ? (
             <p className="text-sm text-muted-foreground" aria-live="polite">
               {pdfMessage}
             </p>
           ) : null}
 
-          <div className="space-y-3 border-t border-border pt-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Calendar className="size-4 text-amber-600" aria-hidden />
-              Google Kalender
-            </div>
+          <details className="space-y-3 rounded-lg border border-border/80 bg-muted/10 p-3">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+              More
+            </summary>
+            <div className="space-y-3 border-t border-border pt-3">
+              <div
+                className={`rounded-md border border-border/70 bg-background/60 p-3 ${
+                  compact ? "" : "hidden"
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Brain className="size-4 text-primary" aria-hidden />
+                  Coach Memory (lokal)
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    Ziel-Priorität
+                    <input
+                      value={coachProfile.goal_priority}
+                      onChange={(e) =>
+                        onCoachProfileChange({ ...coachProfile, goal_priority: e.target.value })
+                      }
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    Wiederkehrende Schmerzen
+                    <input
+                      value={coachProfile.recurring_pain_notes}
+                      onChange={(e) =>
+                        onCoachProfileChange({
+                          ...coachProfile,
+                          recurring_pain_notes: e.target.value,
+                        })
+                      }
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="rounded-md border border-border/70 bg-background/60 p-3">
+                <label
+                  className={`flex items-center gap-2 text-sm ${
+                    telegramConfigured === false
+                      ? "cursor-not-allowed text-muted-foreground/80"
+                      : "cursor-pointer text-muted-foreground"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={sendTelegram && telegramConfigured === true}
+                    onChange={(e) => setSendTelegram(e.target.checked)}
+                    disabled={
+                      pdfLoading ||
+                      telegramConfigured === false ||
+                      telegramConfigured === null
+                    }
+                  />
+                  Zusätzlich per Telegram (Bot-Chat) senden
+                </label>
+                {telegramConfigured === false ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Telegram nicht konfiguriert (`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`).
+                  </p>
+                ) : null}
+              </div>
+              <div className="rounded-md border border-border/70 bg-background/60 p-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Calendar className="size-4 text-amber-600" aria-hidden />
+                  Google Kalender
+                </div>
             {calStatus === null ? (
               <p className="text-xs text-muted-foreground">Kalender-Status …</p>
             ) : !calStatus.configured ? (
@@ -941,7 +1004,9 @@ export function ResultsSection({
                 ) : null}
               </p>
             ) : null}
-          </div>
+              </div>
+            </div>
+          </details>
 
           {prescription.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -976,6 +1041,111 @@ export function ResultsSection({
           )}
         </CardContent>
       </Card>
+
+      <details className="rounded-lg border border-border/80 bg-muted/10 p-3">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+          Raw data table
+        </summary>
+        <div className="mt-3">
+          <Card>
+            <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="text-lg">Aus dem PDF erkannt</CardTitle>
+                <CardDescription>Nach Workout-Tag gruppiert.</CardDescription>
+              </div>
+              <input
+                type="search"
+                placeholder="Filtern (Übung, Datum)…"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                className="h-9 min-w-[200px] max-w-md flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                aria-label="Tabelle nach Übung oder Datum filtern"
+              />
+            </CardHeader>
+            <CardContent>
+              {tableRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Keine Übungszeilen erkannt — evtl. war das PDF leer oder unleserlich.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div
+                    role="toolbar"
+                    aria-label="Sortierung der Zeilen innerhalb jedes Workout-Tags"
+                    className="flex flex-wrap gap-x-4 gap-y-2 border-b border-border pb-3 text-sm"
+                  >
+                    {(
+                      [
+                        ["date", "Datum"],
+                        ["name", "Übung"],
+                        ["sets", "Sätze"],
+                        ["reps", "Wdh."],
+                        ["weight", "Gewicht"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+                        aria-pressed={sortKey === key}
+                        onClick={() => toggleSort(key)}
+                      >
+                        {label}{" "}
+                        <span className="text-xs opacity-70">{sortIndicator(key)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {filteredRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Keine Zeilen passen zum Filter.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupedByDate.map(({ date, rows }) => (
+                        <details
+                          key={date}
+                          className="overflow-hidden rounded-lg border border-border bg-muted/20 [&[open]]:bg-muted/35"
+                        >
+                          <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+                            <ChevronRight
+                              aria-hidden
+                              className="size-4 shrink-0 text-muted-foreground"
+                            />
+                            <span className="tabular-nums">{date}</span>
+                            <span className="font-normal text-muted-foreground">
+                              ({rows.length} {rows.length === 1 ? "Übung" : "Übungen"})
+                            </span>
+                          </summary>
+                          <div className="border-t border-border px-2 pb-3 pt-1">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[1%]">Übung</TableHead>
+                                  <TableHead>Sätze</TableHead>
+                                  <TableHead>Wdh.</TableHead>
+                                  <TableHead>Gewicht</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {rows.map((row, i) => (
+                                  <TableRow key={`${date}-${row.name}-${i}`}>
+                                    <TableCell>{row.name}</TableCell>
+                                    <TableCell>{row.sets}</TableCell>
+                                    <TableCell>{row.reps}</TableCell>
+                                    <TableCell>{row.weight}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </details>
 
       <ExerciseReplacementPanel
         result={result}

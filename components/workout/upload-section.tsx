@@ -17,6 +17,7 @@ import type { RefObject } from "react";
 type Props = {
   maxClientMb: number;
   vercelHint: boolean;
+  compact?: boolean;
   loading: boolean;
   error: string | null;
   fileName: string | null;
@@ -36,6 +37,7 @@ type Props = {
 export function UploadSection({
   maxClientMb,
   vercelHint,
+  compact,
   loading,
   error,
   fileName,
@@ -52,24 +54,34 @@ export function UploadSection({
   showNewAnalysis,
 }: Props) {
   return (
-    <Card className="mb-10 overflow-hidden">
+    <Card className="mb-8 overflow-hidden border-border/80">
       <CardHeader>
         <CardTitle
           id="pdf-upload-title"
           className="flex items-center gap-2 text-lg"
         >
-          <Upload className="size-5 text-primary" />
+          <Upload className="size-5 text-primary/90" />
           PDF hochladen
         </CardTitle>
-        <CardDescription>
-          Drag & Drop oder Datei wählen — nur PDF, max. {maxClientMb} MB
-          {vercelHint ? " (Vercel-kompatibel)" : ""}. Solange du eine Analyse offen
-          hast, gilt jedes neue PDF als <strong>eine zusätzliche</strong> Session; die
-          Tabelle wächst kumulativ (lokal in diesem Browser). „Neue Analyse“ startet
-          ohne vorherige Einträge.
+        <CardDescription className="text-sm">
+          {compact ? (
+            <>
+              Nur PDF, max. {maxClientMb} MB
+              {vercelHint ? " (Vercel-kompatibel)" : ""}. Neue Uploads werden zur
+              offenen Analyse hinzugefügt.
+            </>
+          ) : (
+            <>
+              Drag & Drop oder Datei wählen — nur PDF, max. {maxClientMb} MB
+              {vercelHint ? " (Vercel-kompatibel)" : ""}. Solange du eine Analyse offen
+              hast, gilt jedes neue PDF als <strong>eine zusätzliche</strong> Session; die
+              Tabelle wächst kumulativ (lokal in diesem Browser). „Neue Analyse“ startet
+              ohne vorherige Einträge.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <HistoryBar
           entries={historyEntries}
           onRestore={onRestoreHistory}
@@ -100,7 +112,7 @@ export function UploadSection({
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
           className={cn(
-            "flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             dragActive
               ? "border-primary bg-accent/50"
               : "border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/40",
@@ -124,7 +136,7 @@ export function UploadSection({
                 aria-hidden
               />
               <p className="text-center font-medium">Analyse läuft …</p>
-              <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
+              <p className="mt-1 max-w-sm text-center text-xs text-muted-foreground">
                 PDF wird an Gemini gesendet. Handschrift und Dateigröße können die
                 Dauer beeinflussen (oft 30 Sekunden bis wenige Minuten).
               </p>
