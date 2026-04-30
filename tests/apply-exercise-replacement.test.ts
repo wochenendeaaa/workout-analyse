@@ -25,6 +25,7 @@ const baseResult = (): WorkoutAnalysisResult => ({
     },
   ],
   coach_big_picture: null,
+  coach_followup: null,
 });
 
 describe("applyExerciseReplacementInPrescription", () => {

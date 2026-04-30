@@ -26,11 +26,18 @@ import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacem
 import {
   AlertCircle,
   Calendar,
+  Brain,
   ChevronRight,
   ClipboardList,
   FileDown,
+  MessageSquareQuote,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+  CoachMemoryLocal,
+  CoachProfileLocal,
+  CoachFollowupQuestion,
+} from "@/lib/types/analysis";
 
 function defaultNextSessionLocal(): string {
   const d = new Date();
@@ -97,12 +104,20 @@ function groupRowsByWorkoutDate(
 type Props = {
   result: WorkoutAnalysisResult;
   equipmentContextJson: string;
+  coachProfile: CoachProfileLocal;
+  coachMemory: CoachMemoryLocal;
+  onCoachProfileChange: (next: CoachProfileLocal) => void;
+  onCoachMemoryChange: (next: CoachMemoryLocal) => void;
   onAnalysisUpdate: (next: WorkoutAnalysisResult) => void;
 };
 
 export function ResultsSection({
   result,
   equipmentContextJson,
+  coachProfile,
+  coachMemory,
+  onCoachProfileChange,
+  onCoachMemoryChange,
   onAnalysisUpdate,
 }: Props) {
   const [filterQuery, setFilterQuery] = useState("");
@@ -124,9 +139,13 @@ export function ResultsSection({
   const [calMessage, setCalMessage] = useState<string | null>(null);
   const [calEventLink, setCalEventLink] = useState<string | null>(null);
   const [calBusy, setCalBusy] = useState(false);
+  const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
+  const [refineBusy, setRefineBusy] = useState(false);
+  const [refineMessage, setRefineMessage] = useState<string | null>(null);
 
   const prescription = result.next_session_prescription ?? [];
   const coachBigPicture = result.coach_big_picture;
+  const coachFollowup = result.coach_followup;
 
   const tableRows = useMemo(() => buildTableRows(result), [result]);
 
@@ -370,6 +389,85 @@ export function ResultsSection({
     return sortDir === "asc" ? "↑" : "↓";
   };
 
+  const setFollowupAnswer = useCallback((id: string, value: string) => {
+    setFollowupAnswers((prev) => ({ ...prev, [id]: value }));
+  }, []);
+
+  const refineWithCoachAnswers = useCallback(async () => {
+    setRefineMessage(null);
+    setRefineBusy(true);
+    try {
+      const answers = Object.entries(followupAnswers)
+        .map(([question_id, answer]) => ({ question_id, answer: answer.trim() }))
+        .filter((x) => x.answer.length > 0);
+      const res = await fetch("/api/coach-refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          result,
+          answers,
+          coachProfile,
+          coachMemory,
+        }),
+      });
+      const json = (await res.json()) as WorkoutAnalysisResult | { error?: string; code?: string };
+      if (!res.ok) {
+        const err = json as { error?: string; code?: string };
+        setRefineMessage(
+          userMessageForApiCode(err.code, err.error ?? "Coach-Refine fehlgeschlagen."),
+        );
+        return;
+      }
+      onAnalysisUpdate(json as WorkoutAnalysisResult);
+      setRefineMessage("Coach-Update übernommen.");
+    } catch {
+      setRefineMessage("Netzwerkfehler beim Coach-Refine.");
+    } finally {
+      setRefineBusy(false);
+    }
+  }, [coachMemory, coachProfile, followupAnswers, onAnalysisUpdate, result]);
+
+  const renderQuestionInput = (q: CoachFollowupQuestion) => {
+    if (q.kind === "choice") {
+      return (
+        <select
+          value={followupAnswers[q.id] ?? ""}
+          onChange={(e) => setFollowupAnswer(q.id, e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+        >
+          <option value="">Auswählen …</option>
+          {(q.choices ?? []).map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      );
+    }
+    if (q.kind === "scale") {
+      return (
+        <input
+          type="number"
+          min={1}
+          max={10}
+          placeholder="1-10"
+          value={followupAnswers[q.id] ?? ""}
+          onChange={(e) => setFollowupAnswer(q.id, e.target.value)}
+          className="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
+        />
+      );
+    }
+    return (
+      <textarea
+        rows={2}
+        placeholder="Deine Antwort …"
+        value={followupAnswers[q.id] ?? ""}
+        onChange={(e) => setFollowupAnswer(q.id, e.target.value)}
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      />
+    );
+  };
+
   return (
     <div className="space-y-8">
       <Card>
@@ -486,6 +584,84 @@ export function ResultsSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Brain className="size-4 text-primary" aria-hidden />
+              Coach Memory (lokal)
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Ziel-Priorität
+                <input
+                  value={coachProfile.goal_priority}
+                  onChange={(e) =>
+                    onCoachProfileChange({ ...coachProfile, goal_priority: e.target.value })
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Wiederkehrende Schmerzen
+                <input
+                  value={coachProfile.recurring_pain_notes}
+                  onChange={(e) =>
+                    onCoachProfileChange({
+                      ...coachProfile,
+                      recurring_pain_notes: e.target.value,
+                    })
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Recovery (Schlaf/Stress)
+                <input
+                  value={coachProfile.recovery_notes}
+                  onChange={(e) =>
+                    onCoachProfileChange({ ...coachProfile, recovery_notes: e.target.value })
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Zeit-/Schedule-Constraints
+                <input
+                  value={coachProfile.schedule_constraints}
+                  onChange={(e) =>
+                    onCoachProfileChange({
+                      ...coachProfile,
+                      schedule_constraints: e.target.value,
+                    })
+                  }
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Lokal gespeichert. Sessions im Memory:{" "}
+              {coachMemory.recent_sessions.length}, Gesamt gesehen:{" "}
+              {coachMemory.trend_stats.total_sessions_seen}
+            </p>
+            <button
+              type="button"
+              className="mt-2 text-xs text-muted-foreground underline hover:text-foreground"
+              onClick={() =>
+                onCoachMemoryChange({
+                  recent_sessions: [],
+                  long_term_summary: "",
+                  trend_stats: {
+                    total_sessions_seen: 0,
+                    unique_exercises_seen: 0,
+                    approximate_total_sets: 0,
+                  },
+                  last_updated_at: "",
+                })
+              }
+            >
+              Coach-Memory lokal zurücksetzen
+            </button>
+          </div>
+
           {coachBigPicture ? (
             <div className="rounded-lg border border-amber-400/40 bg-amber-50/30 p-3 dark:bg-amber-900/10">
               <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -500,6 +676,40 @@ export function ResultsSection({
                   ))}
                 </ul>
               ) : null}
+            </div>
+          ) : null}
+
+          {coachFollowup?.required ? (
+            <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <MessageSquareQuote className="size-4 text-primary" aria-hidden />
+                Coach needs clarification
+              </div>
+              <p className="mb-3 text-sm text-muted-foreground">{coachFollowup.reason}</p>
+              <div className="space-y-3">
+                {coachFollowup.questions.map((q) => (
+                  <div key={q.id} className="space-y-1">
+                    <p className="text-sm text-foreground">{q.prompt}</p>
+                    {renderQuestionInput(q)}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={refineBusy}
+                  onClick={() => void refineWithCoachAnswers()}
+                >
+                  {refineBusy ? "Coach …" : "Refine next session"}
+                </Button>
+                {refineMessage ? (
+                  <p className="text-sm text-muted-foreground" aria-live="polite">
+                    {refineMessage}
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 

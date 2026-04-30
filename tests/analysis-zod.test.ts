@@ -11,6 +11,7 @@ describe("workoutAnalysisResultSchema", () => {
       alternative_exercises: [],
       next_session_prescription: [],
       coach_big_picture: null,
+      coach_followup: null,
     };
     const out = workoutAnalysisResultSchema.safeParse(minimal);
     expect(out.success).toBe(true);
@@ -31,6 +32,7 @@ describe("workoutAnalysisResultSchema", () => {
     if (out.success) {
       expect(out.data.next_session_prescription).toEqual([]);
       expect(out.data.coach_big_picture).toBeNull();
+      expect(out.data.coach_followup).toBeNull();
     }
   });
 
@@ -54,6 +56,13 @@ describe("workoutAnalysisResultSchema", () => {
       coach_big_picture: {
         headline: "Stabile Progression bei Push, Unterkörper braucht Feinschliff.",
         watch_outs: ["Kniebeuge-Tiefe konsistent halten", "Deload einplanen bei RPE-Spitze"],
+      },
+      coach_followup: {
+        required: true,
+        reason: "Belastungsgefühl fehlt.",
+        questions: [
+          { id: "rpe", prompt: "Wie schwer fühlte es sich an?", kind: "scale" },
+        ],
       },
     };
     expect(workoutAnalysisResultSchema.safeParse(row).success).toBe(true);

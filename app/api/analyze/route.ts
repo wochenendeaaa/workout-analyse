@@ -5,6 +5,12 @@ import {
   buildWorkoutSystemPrompt,
   parseEquipmentContextField,
 } from "@/lib/equipment-context";
+import {
+  buildCoachMemoryContextBlock,
+  buildCoachProfileContextBlock,
+  parseCoachMemoryField,
+  parseCoachProfileField,
+} from "@/lib/coach-memory-local";
 import { generateWorkoutAnalysisContent } from "@/lib/gemini-workout-generate";
 import { geminiHttpErrorResponse } from "@/lib/gemini-route-errors";
 import { parseAnalysisJson } from "@/lib/parse-analysis-json";
@@ -44,18 +50,39 @@ Aufgabe 5: Erzeuge coach_big_picture als kompakten Meta-Block:
 - watch_outs: 2 bis 4 kurze Punkte mit Risiken/Fokus für die nächste Zeit (z. B. Technik, Ermüdung, Regeneration, Lastsprünge).
 - Keine Floskeln, konkret aus den Daten ableiten.
 
+Aufgabe 6: Erzeuge coach_followup:
+- required: true nur wenn dir wichtige Infos für bessere Coaching-Qualität fehlen (z. B. Schmerzen, Schlaf/Stress, Equipment-Limits, Zeitbudget, RPE-Unsicherheit). Sonst false.
+- reason: kurzer Satz warum Follow-up nötig ist (oder warum nicht).
+- questions: bei required=true 2 bis 4 Fragen, empathisch und konkret; bei required=false leeres Array.
+- kinds:
+  - text: freie Antwort
+  - scale: z. B. Belastung 1-10
+  - choice: mit 2-5 kurzen choices
+- Keine redundanten Fragen, wenn Kontext schon vorhanden ist.
+
 Antwortformat: reines JSON ohne Markdown-Fences (das Ausgabe-Schema ist API-seitig fest vorgegeben).
 
 Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.`;
 
-function buildUserFollowup(priorCount: number, priorJson: string): string {
+function buildUserFollowup(args: {
+  priorCount: number;
+  priorJson: string;
+  coachMemoryJson: string;
+  coachProfileJson: string;
+}): string {
   const base =
     "Bitte analysiere das beigefügte PDF vollständig gemäß den Systemanweisungen. Antworte ausschließlich mit dem JSON-Objekt.";
-  if (priorCount === 0) return base;
-  return `${base}
+  const parts: string[] = [base];
+  if (args.priorCount > 0) {
+    parts.push(`Bereits gespeicherte Trainingstage (JSON — in extracted_data übernehmen und um die neue Einheit aus dem PDF ergänzen):
+${args.priorJson}`);
+  }
+  parts.push(`Lokales Coach-Profil (falls ausgefüllt):
+${args.coachProfileJson}`);
+  parts.push(`Langzeit-Memory (backlog summary + trends + recent sessions):
+${args.coachMemoryJson}`);
 
-Bereits gespeicherte Trainingstage (JSON — in extracted_data übernehmen und um die neue Einheit aus dem PDF ergänzen):
-${priorJson}`;
+  return parts.join("\n\n");
 }
 
 function sleep(ms: number) {
@@ -201,6 +228,8 @@ export async function POST(request: Request) {
       form.get("equipment_context"),
     );
     const priorExtracted = parsePriorExtractedField(form.get("prior_extracted_data"));
+    const coachMemory = parseCoachMemoryField(form.get("coach_memory_local"));
+    const coachProfile = parseCoachProfileField(form.get("coach_profile_local"));
     const systemPrompt = buildWorkoutSystemPrompt(
       SYSTEM_PROMPT,
       equipmentNarrative,
@@ -210,10 +239,12 @@ export async function POST(request: Request) {
     const { parts, cleanup: doCleanup } = await pdfToParts(ai, buf, inlineLimit);
     cleanup = doCleanup;
 
-    const userFollowup = buildUserFollowup(
-      priorExtracted.length,
-      JSON.stringify(priorExtracted),
-    );
+    const userFollowup = buildUserFollowup({
+      priorCount: priorExtracted.length,
+      priorJson: JSON.stringify(priorExtracted),
+      coachMemoryJson: buildCoachMemoryContextBlock(coachMemory),
+      coachProfileJson: buildCoachProfileContextBlock(coachProfile),
+    });
 
     const response = await generateWorkoutAnalysisContent(
       ai,

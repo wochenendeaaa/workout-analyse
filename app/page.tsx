@@ -24,9 +24,20 @@ import {
   stringifyEquipmentPayload,
   type EquipmentContextPayload,
 } from "@/lib/equipment-context";
+import {
+  ingestSessionsIntoCoachMemory,
+  loadCoachMemoryLocal,
+  loadCoachProfileLocal,
+  saveCoachMemoryLocal,
+  saveCoachProfileLocal,
+} from "@/lib/coach-memory-local";
 import { mergeAnalysisHistories } from "@/lib/merge-analyses-history";
 import { MAX_PRIOR_EXTRACTED_DAYS } from "@/lib/prior-extracted";
-import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
+import type {
+  CoachMemoryLocal,
+  CoachProfileLocal,
+  WorkoutAnalysisResult,
+} from "@/lib/types/analysis";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const MAX_CLIENT_BYTES = getClientMaxPdfBytes();
@@ -51,6 +62,12 @@ export default function Home() {
     presetIds: [],
     notes: "",
   });
+  const [coachProfile, setCoachProfile] = useState<CoachProfileLocal>(
+    loadCoachProfileLocal(),
+  );
+  const [coachMemory, setCoachMemory] = useState<CoachMemoryLocal>(
+    loadCoachMemoryLocal(),
+  );
 
   const refreshMergedHistory = useCallback(async () => {
     const local = loadHistory();
@@ -90,6 +107,22 @@ export default function Home() {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      saveCoachProfileLocal(coachProfile);
+    } catch {
+      /* ignore */
+    }
+  }, [coachProfile]);
+
+  useEffect(() => {
+    try {
+      saveCoachMemoryLocal(coachMemory);
+    } catch {
+      /* ignore */
+    }
+  }, [coachMemory]);
 
   useEffect(() => {
     if (!equipmentHydratedRef.current) {
@@ -136,6 +169,8 @@ export default function Home() {
         body.append("file", file);
         body.append("equipment_context", stringifyEquipmentPayload(equipment));
         body.append("prior_extracted_data", JSON.stringify(priorExtracted));
+        body.append("coach_profile_local", JSON.stringify(coachProfile));
+        body.append("coach_memory_local", JSON.stringify(coachMemory));
 
         const res = await fetch("/api/analyze", {
           method: "POST",
@@ -156,6 +191,9 @@ export default function Home() {
 
         const data = json as WorkoutAnalysisResult;
         setResult(data);
+        setCoachMemory((prev) =>
+          ingestSessionsIntoCoachMemory(prev, data.extracted_data),
+        );
         appendHistory(file.name, data);
         saveSessionSnapshot(file.name, data);
 
@@ -172,7 +210,7 @@ export default function Home() {
         setLoading(false);
       }
     },
-    [equipment, refreshMergedHistory, result],
+    [coachMemory, coachProfile, equipment, refreshMergedHistory, result],
   );
 
   const restoreHistoryEntry = useCallback((entry: StoredAnalysis) => {
@@ -274,6 +312,10 @@ export default function Home() {
         <ResultsSection
           result={result}
           equipmentContextJson={stringifyEquipmentPayload(equipment)}
+          coachProfile={coachProfile}
+          coachMemory={coachMemory}
+          onCoachProfileChange={setCoachProfile}
+          onCoachMemoryChange={setCoachMemory}
           onAnalysisUpdate={updateAnalysisResult}
         />
       ) : null}

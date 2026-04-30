@@ -25,6 +25,19 @@ const coachBigPictureSchema = z.object({
   watch_outs: z.array(z.string()),
 });
 
+const coachFollowupQuestionSchema = z.object({
+  id: z.string(),
+  prompt: z.string(),
+  kind: z.enum(["text", "scale", "choice"]),
+  choices: z.array(z.string()).optional(),
+});
+
+const coachFollowupSchema = z.object({
+  required: z.boolean(),
+  reason: z.string(),
+  questions: z.array(coachFollowupQuestionSchema).max(4).default([]),
+});
+
 export const workoutAnalysisResultSchema = z.object({
   extracted_data: z.array(extractedDaySchema),
   progressive_overload_analysis: z.string(),
@@ -42,6 +55,38 @@ export const workoutAnalysisResultSchema = z.object({
     .default([]),
   /** Optional bei älteren gespeicherten Snapshots. */
   coach_big_picture: coachBigPictureSchema.nullable().default(null),
+  /** Optional bei älteren gespeicherten Snapshots. */
+  coach_followup: coachFollowupSchema.nullable().default(null),
 });
 
 export type WorkoutAnalysisParsed = z.infer<typeof workoutAnalysisResultSchema>;
+
+export const coachProfileLocalSchema = z.object({
+  goal_priority: z.string().default(""),
+  recurring_pain_notes: z.string().default(""),
+  recovery_notes: z.string().default(""),
+  schedule_constraints: z.string().default(""),
+  preferred_training_days: z.string().default(""),
+});
+
+export const coachRefineAnswerSchema = z.object({
+  question_id: z.string(),
+  answer: z.string(),
+});
+
+export const coachTrendStatsSchema = z.object({
+  total_sessions_seen: z.number().int().min(0).default(0),
+  unique_exercises_seen: z.number().int().min(0).default(0),
+  approximate_total_sets: z.number().int().min(0).default(0),
+});
+
+export const coachMemoryLocalSchema = z.object({
+  recent_sessions: z.array(extractedDaySchema).default([]),
+  long_term_summary: z.string().default(""),
+  trend_stats: coachTrendStatsSchema.default({
+    total_sessions_seen: 0,
+    unique_exercises_seen: 0,
+    approximate_total_sets: 0,
+  }),
+  last_updated_at: z.string().default(""),
+});
