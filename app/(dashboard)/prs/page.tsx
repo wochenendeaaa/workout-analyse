@@ -68,10 +68,18 @@ export default function PRsPage() {
       </h1>
 
       {!loaded ? null : prs.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-          <p className="text-muted-foreground">
-            Keine Daten — analysiere zuerst ein Training.
+        <div className="rounded-xl border border-border bg-card px-6 py-16 text-center">
+          <div className="mb-3 text-4xl">🏆</div>
+          <p className="mb-1 font-semibold text-foreground">Noch keine Rekorde</p>
+          <p className="mb-5 text-sm text-muted-foreground">
+            Lade dein erstes Training hoch — wir erkennen automatisch deine persönlichen Bestleistungen.
           </p>
+          <a
+            href="/today"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Jetzt Training hochladen →
+          </a>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

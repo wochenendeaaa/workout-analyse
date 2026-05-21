@@ -33,15 +33,17 @@ export async function GET() {
       result: WorkoutAnalysisResult;
     }[] = [];
 
-    // New path: Sessions written post-PR6 (deduped by pdfHash)
+    // New path: Sessions written post-PR6 (deduped by pdfHash in JS to avoid SQLite distinct+orderBy limitations)
     const sessionRows = await prisma.session.findMany({
       where: { userId: session.userId, pdfHash: { not: null } },
-      distinct: ["pdfHash"],
       orderBy: { createdAt: "desc" },
-      take: 30,
-      select: { id: true, createdAt: true, fileName: true, rawGeminiJson: true },
+      take: 120,
+      select: { id: true, createdAt: true, fileName: true, rawGeminiJson: true, pdfHash: true },
     });
+    const seenHashes = new Set<string>();
     for (const r of sessionRows) {
+      if (r.pdfHash && seenHashes.has(r.pdfHash)) continue;
+      if (r.pdfHash) seenHashes.add(r.pdfHash);
       try {
         const out = workoutAnalysisResultSchema.safeParse(JSON.parse(r.rawGeminiJson));
         if (!out.success) continue;
