@@ -1,5 +1,6 @@
 import { detectPRsForSession } from "@/lib/trends/detect-prs-sql";
 import { computeAndSaveStreakForUser } from "@/lib/trends/streak-sql";
+import { evaluateAchievements } from "@/lib/achievements/evaluate";
 import { getSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -33,9 +34,11 @@ export async function POST(request: Request) {
       computeAndSaveStreakForUser(session.userId, prisma),
     ]);
 
-    return NextResponse.json({ ok: true, prs });
+    const achievements = await evaluateAchievements(session.userId, body.data.sessionId);
+
+    return NextResponse.json({ ok: true, prs, achievements });
   } catch (err) {
     console.error("[/api/prs] error", err);
-    return NextResponse.json({ ok: false, prs: [] }, { status: 500 });
+    return NextResponse.json({ ok: false, prs: [], achievements: [] }, { status: 500 });
   }
 }

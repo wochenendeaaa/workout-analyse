@@ -41,6 +41,7 @@ import type {
   WorkoutAnalysisResult,
 } from "@/lib/types/analysis";
 import { StreakChip } from "@/components/workout/streak-chip";
+import { AchievementToast } from "@/components/workout/achievement-toast";
 import {
   detectPRsFromLocalHistory,
   type DetectedPR,
@@ -51,6 +52,8 @@ import {
 } from "@/lib/trends/streak-local";
 import { SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+type NewAchievement = { id: string; title: string; icon: string; isNew: boolean };
 
 const MAX_CLIENT_BYTES = getClientMaxPdfBytes();
 const MAX_CLIENT_MB = getClientMaxPdfMbRounded();
@@ -81,6 +84,7 @@ export default function TodayPage() {
     loadCoachMemoryLocal(),
   );
   const [detectedPRs, setDetectedPRs] = useState<DetectedPR[]>([]);
+  const [newAchievements, setNewAchievements] = useState<NewAchievement[]>([]);
   const [streak, setStreak] = useState<StreakState>({
     currentStreak: 0,
     longestStreak: 0,
@@ -250,9 +254,15 @@ export default function TodayPage() {
               fetch("/api/streak", { credentials: "same-origin" }).catch(() => null),
             ]);
 
-            const prJson = await prRes?.json().catch(() => null) as { prs?: typeof localPrs } | null;
+            const prJson = await prRes?.json().catch(() => null) as {
+              prs?: typeof localPrs;
+              achievements?: NewAchievement[];
+            } | null;
             if (prJson?.prs && prJson.prs.length > 0) {
               setDetectedPRs(prJson.prs);
+            }
+            if (prJson?.achievements && prJson.achievements.length > 0) {
+              setNewAchievements(prJson.achievements);
             }
 
             const streakJson = await streakRes?.json().catch(() => null) as {
@@ -295,6 +305,7 @@ export default function TodayPage() {
     setError(null);
     setFileName(null);
     setDetectedPRs([]);
+    setNewAchievements([]);
     clearSessionSnapshot();
   }, []);
 
@@ -336,6 +347,10 @@ export default function TodayPage() {
 
   return (
     <>
+      <AchievementToast
+        achievements={newAchievements}
+        onDismiss={() => setNewAchievements([])}
+      />
       <a
         href="#content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-md"

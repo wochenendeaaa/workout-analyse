@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Target, TrendingUp, Trophy, Upload } from "lucide-react";
+import { Target, TrendingUp, Trophy, Upload, Users } from "lucide-react";
 
 const TABS = [
   { href: "/today", label: "Heute", Icon: Upload },
   { href: "/trends", label: "Trends", Icon: TrendingUp },
   { href: "/prs", label: "PRs", Icon: Trophy },
   { href: "/next", label: "Nächste", Icon: Target },
+  { href: "/friends", label: "Freunde", Icon: Users },
 ] as const;
 
 export function NavBar() {
