@@ -39,7 +39,6 @@ import type {
   CoachProfileLocal,
   WorkoutAnalysisResult,
 } from "@/lib/types/analysis";
-import { PrBanner } from "@/components/workout/pr-banner";
 import { StreakChip } from "@/components/workout/streak-chip";
 import {
   detectPRsFromLocalHistory,
