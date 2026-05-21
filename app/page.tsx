@@ -81,9 +81,12 @@ export default function Home() {
     loadCoachMemoryLocal(),
   );
   const [detectedPRs, setDetectedPRs] = useState<DetectedPR[]>([]);
-  const [streak, setStreak] = useState<StreakState>(() =>
-    computeStreakFromLocalHistory(loadHistory()),
-  );
+  const [streak, setStreak] = useState<StreakState>({
+    currentStreak: 0,
+    longestStreak: 0,
+    graceDaysUsed: 0,
+    lastSessionDate: null,
+  });
 
   const refreshMergedHistory = useCallback(async () => {
     const local = loadHistory();
@@ -102,6 +105,10 @@ export default function Home() {
   }, []);
 
   const equipmentHydratedRef = useRef(false);
+
+  useEffect(() => {
+    setStreak(computeStreakFromLocalHistory(loadHistory()));
+  }, []);
 
   useEffect(() => {
     const snap = loadSessionSnapshot();
