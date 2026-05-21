@@ -18,17 +18,23 @@ function collectSessionDates(history: StoredAnalysis[]): Date[] {
       if (day.date && day.date.length >= 10) {
         const key = day.date.slice(0, 10);
         if (!seen.has(key)) {
-          seen.add(key);
-          dates.push(new Date(key));
-          added = true;
+          const d = new Date(key);
+          if (!isNaN(d.getTime())) {
+            seen.add(key);
+            dates.push(d);
+            added = true;
+          }
         }
       }
     }
     if (!added && entry.savedAt) {
       const key = entry.savedAt.slice(0, 10);
       if (!seen.has(key)) {
-        seen.add(key);
-        dates.push(new Date(key));
+        const d = new Date(key);
+        if (!isNaN(d.getTime())) {
+          seen.add(key);
+          dates.push(d);
+        }
       }
     }
   }

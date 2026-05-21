@@ -19,6 +19,7 @@ export function computeStreakFromDates(dates: Date[]): StreakResult {
   const seen = new Set<string>();
   const unique: Date[] = [];
   for (const d of dates) {
+    if (isNaN(d.getTime())) continue;
     const key = d.toISOString().slice(0, 10);
     if (!seen.has(key)) {
       seen.add(key);

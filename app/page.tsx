@@ -106,7 +106,11 @@ export default function Home() {
   const equipmentHydratedRef = useRef(false);
 
   useEffect(() => {
-    setStreak(computeStreakFromLocalHistory(loadHistory()));
+    try {
+      setStreak(computeStreakFromLocalHistory(loadHistory()));
+    } catch {
+      /* ignore malformed history dates */
+    }
   }, []);
 
   useEffect(() => {
