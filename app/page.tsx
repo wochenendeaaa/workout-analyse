@@ -211,21 +211,59 @@ export default function Home() {
           ingestSessionsIntoCoachMemory(prev, data.extracted_data),
         );
 
-        // Detect PRs before appending so history only contains previous sessions
+        // Detect PRs against localStorage before appending (so only prior sessions count)
         const currentHistory = loadHistory();
-        const prs = detectPRsFromLocalHistory(data, currentHistory);
-        setDetectedPRs(prs);
+        const localPrs = detectPRsFromLocalHistory(data, currentHistory);
+        setDetectedPRs(localPrs);
 
         appendHistory(file.name, data);
         saveSessionSnapshot(file.name, data);
-
         setStreak(computeStreakFromLocalHistory(loadHistory()));
 
-        await fetch("/api/analyses", {
+        // Save to server (dual-write: blob + relational rows)
+        const saveRes = await fetch("/api/analyses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fileName: file.name, result: data }),
-        }).catch(() => {});
+          credentials: "same-origin",
+        }).catch(() => null);
+
+        // If logged in, upgrade to SQL-backed PRs and streak
+        if (saveRes?.ok) {
+          const saveJson = await saveRes.json().catch(() => null) as { sessionId?: string } | null;
+          if (saveJson?.sessionId) {
+            const [prRes, streakRes] = await Promise.all([
+              fetch("/api/prs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: saveJson.sessionId }),
+                credentials: "same-origin",
+              }).catch(() => null),
+              fetch("/api/streak", { credentials: "same-origin" }).catch(() => null),
+            ]);
+
+            const prJson = await prRes?.json().catch(() => null) as { prs?: typeof localPrs } | null;
+            if (prJson?.prs && prJson.prs.length > 0) {
+              setDetectedPRs(prJson.prs);
+            }
+
+            const streakJson = await streakRes?.json().catch(() => null) as {
+              enabled?: boolean;
+              currentStreak?: number;
+              longestStreak?: number;
+              graceDaysUsed?: number;
+              lastSessionDate?: string | null;
+            } | null;
+            if (streakJson?.enabled) {
+              setStreak({
+                currentStreak: streakJson.currentStreak ?? 0,
+                longestStreak: streakJson.longestStreak ?? 0,
+                graceDaysUsed: streakJson.graceDaysUsed ?? 0,
+                lastSessionDate: streakJson.lastSessionDate ?? null,
+              });
+            }
+          }
+        }
 
         await refreshMergedHistory();
       } catch {

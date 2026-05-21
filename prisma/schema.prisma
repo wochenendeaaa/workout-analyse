@@ -12,9 +12,11 @@ model User {
   email                    String            @unique
   passwordHash             String
   createdAt                DateTime          @default(now())
-  /** AES-GCM verschlüsselter Google OAuth Refresh Token (Base64) */
   googleCalendarRefreshEnc String?
   analyses                 WorkoutAnalysis[]
+  sessions                 Session[]
+  personalRecords          PersonalRecord[]
+  streakState              StreakState?
 }
 
 model WorkoutAnalysis {
@@ -26,4 +28,91 @@ model WorkoutAnalysis {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ── Relational training log ─────────────────────────────────────────────────
+
+model Session {
+  id             String             @id @default(cuid())
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime
+  pdfHash        String?
+  rawGeminiJson  String
+  fileName       String?
+  notes          String?
+  createdAt      DateTime           @default(now())
+  exercises      ExerciseInstance[]
+  personalRecords PersonalRecord[]
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+model ExerciseCatalog {
+  id            String             @id @default(cuid())
+  canonicalName String             @unique
+  aliases       String
+  muscleGroup   String?
+  instances     ExerciseInstance[]
+  records       PersonalRecord[]
+
+  @@index([canonicalName])
+}
+
+model ExerciseInstance {
+  id             String           @id @default(cuid())
+  sessionId      String
+  session        Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  catalogId      String?
+  catalog        ExerciseCatalog? @relation(fields: [catalogId], references: [id])
+  rawName        String
+  orderInSession Int
+  sets           SetEntry[]
+
+  @@index([sessionId])
+  @@index([catalogId])
+}
+
+model SetEntry {
+  id         String           @id @default(cuid())
+  instanceId String
+  instance   ExerciseInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  setNumber  Int
+  weightKg   Float?
+  reps       Int?
+  rpe        Float?
+  notes      String?
+  setType    String           @default("working")
+
+  @@index([instanceId])
+}
+
+model PersonalRecord {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalogId    String?
+  catalog      ExerciseCatalog? @relation(fields: [catalogId], references: [id])
+  exerciseName String
+  prType       String
+  value        Float
+  achievedAt   DateTime
+  sessionId    String
+  session      Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@index([userId])
+  @@index([userId, catalogId])
+}
+
+model StreakState {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak          Int       @default(0)
+  longestStreak          Int       @default(0)
+  graceDaysUsedThisMonth Int       @default(0)
+  lastSessionDate        DateTime?
+  updatedAt              DateTime  @updatedAt
 }

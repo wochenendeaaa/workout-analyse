@@ -1,9 +1,15 @@
 import { workoutAnalysisResultSchema } from "@/lib/analysis-zod";
 import { getSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
+import { parseWeightKg } from "@/lib/volume-stats";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+
+function parseReps(s: string): number | null {
+  const m = String(s).replace(",", ".").match(/\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
 
 export const runtime = "nodejs";
 
@@ -84,6 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Ungültiger Body" }, { status: 400 });
     }
     const { fileName, result } = body.data;
+    // Legacy blob write (kept until PR 6 removes it)
     await prisma.workoutAnalysis.create({
       data: {
         fileName: fileName ?? null,
@@ -91,7 +98,57 @@ export async function POST(request: Request) {
         userId: session.userId,
       },
     });
-    return NextResponse.json({ ok: true });
+
+    // Relational write: Session + ExerciseInstance + SetEntry
+    let sessionId: string | null = null;
+    try {
+      for (const day of result.extracted_data) {
+        const rawDate = day.date?.trim();
+        const date = rawDate ? new Date(rawDate) : new Date();
+        if (isNaN(date.getTime())) continue;
+
+        const sessionRow = await prisma.session.create({
+          data: {
+            userId: session.userId,
+            date,
+            fileName: fileName ?? null,
+            rawGeminiJson: JSON.stringify(result),
+          },
+        });
+        if (!sessionId) sessionId = sessionRow.id;
+
+        for (let eIdx = 0; eIdx < day.exercises.length; eIdx++) {
+          const ex = day.exercises[eIdx];
+          const instance = await prisma.exerciseInstance.create({
+            data: {
+              sessionId: sessionRow.id,
+              rawName: ex.name,
+              orderInSession: eIdx,
+            },
+          });
+
+          const w = parseWeightKg(ex.weight);
+          const r = parseReps(ex.reps);
+          const setsCount = parseInt(String(ex.sets).match(/\d+/)?.[0] ?? "1", 10) || 1;
+
+          for (let sIdx = 0; sIdx < setsCount; sIdx++) {
+            await prisma.setEntry.create({
+              data: {
+                instanceId: instance.id,
+                setNumber: sIdx + 1,
+                weightKg: w ?? null,
+                reps: r ?? null,
+              },
+            });
+          }
+        }
+      }
+    } catch (relErr) {
+      // Relational write failure is non-fatal; blob is already saved
+      console.error("[analyses POST] relational write failed", relErr);
+    }
+
+    return NextResponse.json({ ok: true, sessionId });
   } catch {
     return NextResponse.json({ ok: false, error: "Speichern fehlgeschlagen" }, { status: 500 });
   }
