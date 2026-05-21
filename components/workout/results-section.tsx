@@ -23,6 +23,7 @@ import {
 import { userMessageForApiCode } from "@/lib/api-error-messages";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { ExerciseReplacementPanel } from "@/components/workout/exercise-replacement-panel";
+import { PrBanner } from "@/components/workout/pr-banner";
 import {
   AlertCircle,
   Calendar,
@@ -125,6 +126,7 @@ type Props = {
   onCoachProfileChange: (next: CoachProfileLocal) => void;
   onCoachMemoryChange: (next: CoachMemoryLocal) => void;
   onAnalysisUpdate: (next: WorkoutAnalysisResult) => void;
+  detectedPRs?: import("@/lib/trends/detect-prs-local").DetectedPR[];
 };
 
 export function ResultsSection({
@@ -136,6 +138,7 @@ export function ResultsSection({
   onCoachProfileChange,
   onCoachMemoryChange,
   onAnalysisUpdate,
+  detectedPRs,
 }: Props) {
   const [filterQuery, setFilterQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -621,6 +624,9 @@ export function ResultsSection({
 
   return (
     <div className="space-y-6">
+      {detectedPRs && detectedPRs.length > 0 && (
+        <PrBanner prs={detectedPRs} />
+      )}
       {!compact ? (
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

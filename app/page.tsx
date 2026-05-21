@@ -39,6 +39,16 @@ import type {
   CoachProfileLocal,
   WorkoutAnalysisResult,
 } from "@/lib/types/analysis";
+import { PrBanner } from "@/components/workout/pr-banner";
+import { StreakChip } from "@/components/workout/streak-chip";
+import {
+  detectPRsFromLocalHistory,
+  type DetectedPR,
+} from "@/lib/trends/detect-prs-local";
+import {
+  computeStreakFromLocalHistory,
+  type StreakState,
+} from "@/lib/trends/streak-local";
 import { SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -69,6 +79,10 @@ export default function Home() {
   );
   const [coachMemory, setCoachMemory] = useState<CoachMemoryLocal>(
     loadCoachMemoryLocal(),
+  );
+  const [detectedPRs, setDetectedPRs] = useState<DetectedPR[]>([]);
+  const [streak, setStreak] = useState<StreakState>(() =>
+    computeStreakFromLocalHistory(loadHistory()),
   );
 
   const refreshMergedHistory = useCallback(async () => {
@@ -196,8 +210,16 @@ export default function Home() {
         setCoachMemory((prev) =>
           ingestSessionsIntoCoachMemory(prev, data.extracted_data),
         );
+
+        // Detect PRs before appending so history only contains previous sessions
+        const currentHistory = loadHistory();
+        const prs = detectPRsFromLocalHistory(data, currentHistory);
+        setDetectedPRs(prs);
+
         appendHistory(file.name, data);
         saveSessionSnapshot(file.name, data);
+
+        setStreak(computeStreakFromLocalHistory(loadHistory()));
 
         await fetch("/api/analyses", {
           method: "POST",
@@ -226,6 +248,7 @@ export default function Home() {
     setResult(null);
     setError(null);
     setFileName(null);
+    setDetectedPRs([]);
     clearSessionSnapshot();
   }, []);
 
@@ -275,15 +298,20 @@ export default function Home() {
       </a>
       <header className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
         <div className="mb-8 text-center sm:text-left">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary/90">
-            Workout Coach
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Trainingsplan aus PDF verstehen
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Upload, Coach-Insight, nächste Session.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary/90">
+                Workout Coach
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                Trainingsplan aus PDF verstehen
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Upload, Coach-Insight, nächste Session.
+              </p>
+            </div>
+            <StreakChip streak={streak} />
+          </div>
         </div>
       </header>
 
@@ -334,6 +362,7 @@ export default function Home() {
           onCoachProfileChange={setCoachProfile}
           onCoachMemoryChange={setCoachMemory}
           onAnalysisUpdate={updateAnalysisResult}
+          detectedPRs={detectedPRs}
         />
       ) : null}
       </main>
