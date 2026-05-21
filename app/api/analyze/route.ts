@@ -70,7 +70,32 @@ Aufgabe 8: Erzeuge tomorrow_plan auch ohne Debrief:
 
 Antwortformat: reines JSON ohne Markdown-Fences (das Ausgabe-Schema ist API-seitig fest vorgegeben).
 
-Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.`;
+Wichtig für extracted_data:
+- "sets": Anzahl der Arbeitssätze als Zahl-String, z.B. "4" oder "3". Notation wie "4x5" → sets="4", reps="5".
+- "reps": Wiederholungen als Zahl oder Spanne, z.B. "8" oder "8-10".
+- "weight": Gewicht mit Einheit, z.B. "80 kg" oder "175 lbs". Wenn nur Körpergewicht: "BW". Wenn unleserlich: "?".
+- Übungsnamen auf Deutsch, wenn im Log Deutsch; sonst wie geschrieben.
+
+Wenn Werte nicht lesbar sind, nutze eine leere Zeichenkette oder "unleserlich" und erwähne das knapp in progressive_overload_analysis.
+
+Beispiel extracted_data (zeigt erwartetes Format):
+[
+  {
+    "date": "2024-03-15",
+    "exercises": [
+      {"name": "Bankdrücken", "sets": "4", "reps": "6", "weight": "100 kg"},
+      {"name": "Schulterdrücken", "sets": "3", "reps": "8-10", "weight": "60 kg"},
+      {"name": "Klimmzüge", "sets": "3", "reps": "8", "weight": "BW"}
+    ]
+  },
+  {
+    "date": "2024-03-18",
+    "exercises": [
+      {"name": "Kniebeuge", "sets": "5", "reps": "5", "weight": "120 kg"},
+      {"name": "Kreuzheben", "sets": "3", "reps": "3", "weight": "160 kg"}
+    ]
+  }
+]`;
 
 function buildUserFollowup(args: {
   priorCount: number;

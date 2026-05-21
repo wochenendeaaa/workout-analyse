@@ -1,0 +1,23 @@
+{
+  "extracted_data": [
+    {
+      "date": "2024-03-18",
+      "exercises": [
+        { "name": "Kniebeuge", "sets": "5", "reps": "5", "weight": "120 kg" },
+        { "name": "Kreuzheben", "sets": "3", "reps": "3", "weight": "160 kg" },
+        { "name": "Beinpresse", "sets": "3", "reps": "12", "weight": "200 kg" }
+      ]
+    }
+  ],
+  "progressive_overload_analysis": "Unterkörper-Focus. Kniebeuge und Kreuzheben auf hohem Niveau.",
+  "coach_tips": ["Kniebeugen-Tiefe prüfen.", "Kreuzheben-Rückenposition kontrollieren."],
+  "alternative_exercises": [],
+  "next_session_prescription": [
+    { "exercise_name": "Kniebeuge", "target_sets": "5", "target_reps": "5", "suggested_weight": "122,5 kg", "rationale": "+2,5 kg progressive Steigerung." },
+    { "exercise_name": "Kreuzheben", "target_sets": "3", "target_reps": "3", "suggested_weight": "165 kg", "rationale": "+5 kg, wenn Technik sauber." }
+  ],
+  "coach_big_picture": { "headline": "Unterkörperkraft auf gutem Weg.", "watch_outs": ["Rückenermüdung bei Kreuzheben beobachten.", "Knie-Tracking beim Squat."] },
+  "coach_followup": { "required": false, "reason": "Keine offenen Fragen.", "questions": [] },
+  "post_workout_debrief": null,
+  "tomorrow_plan": { "status": "as_planned", "summary": "Oberkörper als nächstes.", "top_priorities": ["Regeneration", "Schlaf"], "caution_flags": [] }
+}

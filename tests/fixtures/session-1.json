@@ -1,0 +1,22 @@
+{
+  "extracted_data": [
+    {
+      "date": "2024-03-15",
+      "exercises": [
+        { "name": "Bankdrücken", "sets": "4", "reps": "6", "weight": "100 kg" },
+        { "name": "Schulterdrücken", "sets": "3", "reps": "8-10", "weight": "60 kg" },
+        { "name": "Klimmzüge", "sets": "3", "reps": "8", "weight": "BW" }
+      ]
+    }
+  ],
+  "progressive_overload_analysis": "Erste Session — kein Vergleich möglich.",
+  "coach_tips": ["Technik beim Bankdrücken beobachten.", "Schultern warm halten."],
+  "alternative_exercises": [],
+  "next_session_prescription": [
+    { "exercise_name": "Bankdrücken", "target_sets": "4", "target_reps": "6", "suggested_weight": "100 kg", "rationale": "Gewicht halten, Technik festigen." }
+  ],
+  "coach_big_picture": { "headline": "Guter Start, Basis aufbauen.", "watch_outs": ["Schulterbelastung beobachten."] },
+  "coach_followup": { "required": false, "reason": "Alle Infos vorhanden.", "questions": [] },
+  "post_workout_debrief": null,
+  "tomorrow_plan": { "status": "as_planned", "summary": "Nächste Session wie geplant.", "top_priorities": ["Technik"], "caution_flags": [] }
+}

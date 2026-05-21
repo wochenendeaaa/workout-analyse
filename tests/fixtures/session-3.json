@@ -1,0 +1,23 @@
+{
+  "extracted_data": [
+    {
+      "date": "2024-03-20",
+      "exercises": [
+        { "name": "Bankdrücken", "sets": "4", "reps": "6", "weight": "102,5 kg" },
+        { "name": "Schrägbankdrücken", "sets": "3", "reps": "8-10", "weight": "80 kg" },
+        { "name": "Trizeps Strecken", "sets": "3", "reps": "12", "weight": "30 kg" },
+        { "name": "Bizepscurl", "sets": "3", "reps": "10", "weight": "20 kg" }
+      ]
+    }
+  ],
+  "progressive_overload_analysis": "Bankdrücken +2,5 kg gegenüber letzter Session — gute Progression.",
+  "coach_tips": ["Trizeps-Arbeit intensivieren.", "Ellbogen beim Curl stabil halten."],
+  "alternative_exercises": [],
+  "next_session_prescription": [
+    { "exercise_name": "Bankdrücken", "target_sets": "4", "target_reps": "6", "suggested_weight": "102,5 kg", "rationale": "Gewicht halten, Wdh. erhöhen oder Technik optimieren." }
+  ],
+  "coach_big_picture": { "headline": "Konstante Steigerung im Oberkörper.", "watch_outs": ["Schultern regenerieren lassen."] },
+  "coach_followup": { "required": true, "reason": "RPE unklar.", "questions": [{ "id": "q1", "prompt": "Wie war die Belastung heute (1-10)?", "kind": "scale" }] },
+  "post_workout_debrief": null,
+  "tomorrow_plan": { "status": "light_adjustment", "summary": "Leichter Unterkörpertag empfohlen.", "top_priorities": ["Mobilität", "Regeneration"], "caution_flags": ["Schulterbelastung minimal halten."] }
+}

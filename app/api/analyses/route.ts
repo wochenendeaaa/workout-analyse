@@ -1,15 +1,11 @@
 import { workoutAnalysisResultSchema } from "@/lib/analysis-zod";
 import { getSession } from "@/lib/auth-session";
+import { canonicalize } from "@/lib/exercise-canon";
+import { normalizeExercise } from "@/lib/normalize-exercise";
 import { prisma } from "@/lib/prisma";
-import { parseWeightKg } from "@/lib/volume-stats";
 import type { WorkoutAnalysisResult } from "@/lib/types/analysis";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
-function parseReps(s: string): number | null {
-  const m = String(s).replace(",", ".").match(/\d+/);
-  return m ? parseInt(m[0], 10) : null;
-}
 
 export const runtime = "nodejs";
 
@@ -102,6 +98,11 @@ export async function POST(request: Request) {
     // Relational write: Session + ExerciseInstance + SetEntry
     let sessionId: string | null = null;
     try {
+      // Load catalog once for canonicalization
+      const catalog = await prisma.exerciseCatalog.findMany({
+        select: { id: true, canonicalName: true, aliases: true },
+      });
+
       for (const day of result.extracted_data) {
         const rawDate = day.date?.trim();
         const date = rawDate ? new Date(rawDate) : new Date();
@@ -119,25 +120,25 @@ export async function POST(request: Request) {
 
         for (let eIdx = 0; eIdx < day.exercises.length; eIdx++) {
           const ex = day.exercises[eIdx];
+          const norm = normalizeExercise(ex);
+          const canon = canonicalize(ex.name, catalog);
+
           const instance = await prisma.exerciseInstance.create({
             data: {
               sessionId: sessionRow.id,
               rawName: ex.name,
+              catalogId: canon?.catalogId ?? null,
               orderInSession: eIdx,
             },
           });
 
-          const w = parseWeightKg(ex.weight);
-          const r = parseReps(ex.reps);
-          const setsCount = parseInt(String(ex.sets).match(/\d+/)?.[0] ?? "1", 10) || 1;
-
-          for (let sIdx = 0; sIdx < setsCount; sIdx++) {
+          for (let sIdx = 0; sIdx < norm.sets; sIdx++) {
             await prisma.setEntry.create({
               data: {
                 instanceId: instance.id,
                 setNumber: sIdx + 1,
-                weightKg: w ?? null,
-                reps: r ?? null,
+                weightKg: norm.weightKg ?? null,
+                reps: norm.reps ?? null,
               },
             });
           }

@@ -5,12 +5,18 @@ function parseLooseInt(s: string): number {
   return m ? parseInt(m[0], 10) : 0;
 }
 
-/** Erste Zahl in der Gewichtszeichenkette als kg (heuristisch). */
+/** Erste Zahl in der Gewichtszeichenkette als kg (heuristisch). Konvertiert lbs automatisch. */
 export function parseWeightKg(s: string): number | null {
-  const m = String(s).replace(",", ".").match(/(\d+(?:\.\d+)?)/);
+  const str = String(s).replace(",", ".");
+  const lbs = /(\d+(?:\.\d+)?)\s*(?:lbs?|lb\.?|pounds?)/i.exec(str);
+  if (lbs) {
+    const v = parseFloat(lbs[1]) * 0.453592;
+    return Math.round(v * 10) / 10;
+  }
+  const m = /(\d+(?:\.\d+)?)/.exec(str);
   if (!m) return null;
   const v = parseFloat(m[1]);
-  return Number.isFinite(v) ? v : null;
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 /**
