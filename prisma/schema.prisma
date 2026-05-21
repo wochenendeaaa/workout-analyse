@@ -13,10 +13,38 @@ model User {
   passwordHash             String
   createdAt                DateTime          @default(now())
   googleCalendarRefreshEnc String?
+  telegramChatId           String?
+  friendCode               String            @unique @default(cuid())
   analyses                 WorkoutAnalysis[]
   sessions                 Session[]
   personalRecords          PersonalRecord[]
   streakState              StreakState?
+  achievements             Achievement[]
+  friends                  Friendship[]      @relation("UserFriends")
+  friendOf                 Friendship[]      @relation("FriendOf")
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+  user      User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendOf",    fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+}
+
+model Achievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
 }
 
 model WorkoutAnalysis {
