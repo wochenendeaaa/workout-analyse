@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 const postBodySchema = z.object({
   fileName: z.string().nullable().optional(),
   result: workoutAnalysisResultSchema,
+  pdfHash: z.string().optional(),
 });
 
 export async function GET() {
@@ -20,39 +21,51 @@ export async function GET() {
   }
   const session = await getSession();
 
+  if (!session) {
+    return NextResponse.json({ enabled: false, items: [] });
+  }
+
   try {
-    const rows = await prisma.workoutAnalysis.findMany({
-      where: session
-        ? { userId: session.userId }
-        : { userId: null },
-      orderBy: { createdAt: "desc" },
-      take: 30,
-    });
     const items: {
       id: string;
       savedAt: string;
       fileName: string | null;
       result: WorkoutAnalysisResult;
     }[] = [];
-    for (const r of rows) {
-      try {
-        const parsed = JSON.parse(r.payload) as unknown;
-        const out = workoutAnalysisResultSchema.safeParse(parsed);
-        if (!out.success) continue;
-        items.push({
-          id: `db-${r.id}`,
-          savedAt: r.createdAt.toISOString(),
-          fileName: r.fileName,
-          result: out.data,
-        });
-      } catch {
-        /* skip corrupt row */
-      }
-    }
-    return NextResponse.json({
-      enabled: true,
-      items,
+
+    // New path: Sessions written post-PR6 (deduped by pdfHash)
+    const sessionRows = await prisma.session.findMany({
+      where: { userId: session.userId, pdfHash: { not: null } },
+      distinct: ["pdfHash"],
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: { id: true, createdAt: true, fileName: true, rawGeminiJson: true },
     });
+    for (const r of sessionRows) {
+      try {
+        const out = workoutAnalysisResultSchema.safeParse(JSON.parse(r.rawGeminiJson));
+        if (!out.success) continue;
+        items.push({ id: `sess-${r.id}`, savedAt: r.createdAt.toISOString(), fileName: r.fileName, result: out.data });
+      } catch { /* skip */ }
+    }
+
+    // Legacy path: WorkoutAnalysis blob table (pre-PR6 uploads)
+    const blobRows = await prisma.workoutAnalysis.findMany({
+      where: { userId: session.userId },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    });
+    for (const r of blobRows) {
+      try {
+        const out = workoutAnalysisResultSchema.safeParse(JSON.parse(r.payload));
+        if (!out.success) continue;
+        items.push({ id: `db-${r.id}`, savedAt: r.createdAt.toISOString(), fileName: r.fileName, result: out.data });
+      } catch { /* skip */ }
+    }
+
+    // Sort newest first, cap at 30
+    items.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    return NextResponse.json({ enabled: true, items: items.slice(0, 30) });
   } catch {
     return NextResponse.json({ enabled: false, items: [] });
   }
@@ -85,15 +98,7 @@ export async function POST(request: Request) {
     if (!body.success) {
       return NextResponse.json({ ok: false, error: "Ungültiger Body" }, { status: 400 });
     }
-    const { fileName, result } = body.data;
-    // Legacy blob write (kept until PR 6 removes it)
-    await prisma.workoutAnalysis.create({
-      data: {
-        fileName: fileName ?? null,
-        payload: JSON.stringify(result),
-        userId: session.userId,
-      },
-    });
+    const { fileName, result, pdfHash } = body.data;
 
     // Relational write: Session + ExerciseInstance + SetEntry
     let sessionId: string | null = null;
@@ -114,6 +119,7 @@ export async function POST(request: Request) {
             date,
             fileName: fileName ?? null,
             rawGeminiJson: JSON.stringify(result),
+            pdfHash: pdfHash ?? null,
           },
         });
         if (!sessionId) sessionId = sessionRow.id;
@@ -167,7 +173,10 @@ export async function DELETE() {
     );
   }
   try {
-    await prisma.workoutAnalysis.deleteMany({ where: { userId: session.userId } });
+    await Promise.all([
+      prisma.workoutAnalysis.deleteMany({ where: { userId: session.userId } }),
+      prisma.session.deleteMany({ where: { userId: session.userId } }),
+    ]);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });

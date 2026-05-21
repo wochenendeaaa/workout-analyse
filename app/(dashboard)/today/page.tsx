@@ -208,6 +208,7 @@ export default function TodayPage() {
           body,
         });
 
+        const pdfHash = res.headers.get("X-PDF-Hash") ?? undefined;
         const json = (await res.json()) as WorkoutAnalysisResult | ApiErrorBody;
 
         if (!res.ok) {
@@ -237,7 +238,7 @@ export default function TodayPage() {
         const saveRes = await fetch("/api/analyses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileName: file.name, result: data }),
+          body: JSON.stringify({ fileName: file.name, result: data, pdfHash }),
           credentials: "same-origin",
         }).catch(() => null);
 

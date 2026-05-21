@@ -1,5 +1,6 @@
 import { GoogleGenAI, createPartFromUri, type Part } from "@google/genai";
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 
 import {
   buildWorkoutSystemPrompt,
@@ -17,6 +18,8 @@ import { parseAnalysisJson } from "@/lib/parse-analysis-json";
 import { parsePriorExtractedField } from "@/lib/prior-extracted";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getServerMaxPdfBytes } from "@/lib/upload-limits";
+import { getSession } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -25,8 +28,8 @@ function inlinePdfThresholdBytes(maxUpload: number): number {
   return Math.min(12 * 1024 * 1024, maxUpload);
 }
 
-/** Standard: 2.5 Pro für schwer lesbare Handschrift; alternativ GEMINI_MODEL=gemini-2.5-flash */
-const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-pro";
+const MODEL_FLASH = process.env.GEMINI_MODEL_FLASH?.trim() || "gemini-2.5-flash";
+const MODEL_PRO = process.env.GEMINI_MODEL_PRO?.trim() || "gemini-2.5-pro";
 
 const SYSTEM_PROMPT = `Du bist ein professioneller Powerlifting- und Fitness-Coach. Im Anhang findest du ein PDF mit handschriftlichen Trainingsaufzeichnungen.
 
@@ -257,6 +260,29 @@ export async function POST(request: Request) {
       );
     }
 
+    const pdfHash = createHash("sha256").update(buf).digest("hex");
+
+    // ── Hash cache check (logged-in users only) ──────────────────────────────
+    if (process.env.DATABASE_URL?.trim()) {
+      try {
+        const userSession = await getSession();
+        if (userSession) {
+          const cached = await prisma.session.findFirst({
+            where: { userId: userSession.userId, pdfHash },
+            select: { rawGeminiJson: true },
+          });
+          if (cached) {
+            const data = parseAnalysisJson(cached.rawGeminiJson);
+            return NextResponse.json(data, {
+              headers: { "X-Cache": "HIT", "X-PDF-Hash": pdfHash },
+            });
+          }
+        }
+      } catch {
+        /* cache miss on error — fall through to Gemini */
+      }
+    }
+
     const equipmentNarrative = parseEquipmentContextField(
       form.get("equipment_context"),
     );
@@ -279,45 +305,80 @@ export async function POST(request: Request) {
       coachProfileJson: buildCoachProfileContextBlock(coachProfile),
     });
 
-    const response = await generateWorkoutAnalysisContent(
-      ai,
-      MODEL,
-      parts,
-      userFollowup,
-      systemPrompt,
-    );
+    // ── Flash-first routing: try cheap model, fall back to Pro ───────────────
+    let data: ReturnType<typeof parseAnalysisJson> | null = null;
+    let lastParseError: unknown = null;
 
-    const raw = response.text;
-    if (!raw?.trim()) {
-      return NextResponse.json(
-        {
-          error:
-            "Das Modell hat keine nutzbare Antwort geliefert (evtl. Sicherheitsfilter oder unlesbares PDF).",
-          code: "EMPTY_MODEL_RESPONSE",
-        },
-        { status: 502 },
-      );
+    for (const model of [MODEL_FLASH, MODEL_PRO]) {
+      let raw: string | undefined;
+      try {
+        const response = await generateWorkoutAnalysisContent(
+          ai,
+          model,
+          parts,
+          userFollowup,
+          systemPrompt,
+        );
+        raw = response.text ?? undefined;
+      } catch (err) {
+        if (model === MODEL_PRO) throw err;
+        console.warn(`[analyze] ${model} request failed, falling back to Pro:`, err);
+        continue;
+      }
+
+      if (!raw?.trim()) {
+        if (model === MODEL_PRO) {
+          return NextResponse.json(
+            {
+              error:
+                "Das Modell hat keine nutzbare Antwort geliefert (evtl. Sicherheitsfilter oder unlesbares PDF).",
+              code: "EMPTY_MODEL_RESPONSE",
+            },
+            { status: 502 },
+          );
+        }
+        continue;
+      }
+
+      try {
+        const parsed = parseAnalysisJson(raw);
+
+        // Quality gate: if Flash returns too many unknown values, upgrade to Pro
+        if (model === MODEL_FLASH) {
+          const allEx = parsed.extracted_data.flatMap((d) => d.exercises);
+          const badCount = allEx.filter(
+            (ex) => !ex.weight || ex.weight === "?" || !ex.reps || ex.reps === "?",
+          ).length;
+          if (allEx.length > 0 && badCount > 2) {
+            console.info(`[analyze] Flash quality too low (${badCount} unknown fields), retrying with Pro`);
+            continue;
+          }
+        }
+
+        data = parsed;
+        break;
+      } catch (e) {
+        lastParseError = e;
+        if (model === MODEL_PRO) break;
+        console.warn(`[analyze] ${model} parse failed, retrying with Pro`);
+      }
     }
 
-    let data;
-    try {
-      data = parseAnalysisJson(raw);
-    } catch (e) {
+    if (!data) {
       const hint =
-        e instanceof Error && e.message === "MODEL_JSON_PARSE"
+        lastParseError instanceof Error && lastParseError.message === "MODEL_JSON_PARSE"
           ? "Ungültiges JSON."
           : "JSON-Struktur entspricht nicht dem erwarteten Schema.";
       return NextResponse.json(
         {
           error: `Antwort der KI konnte nicht verarbeitet werden (${hint})`,
           code: "PARSE_ERROR",
-          rawPreview: raw.slice(0, 800),
         },
         { status: 502 },
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: { "X-PDF-Hash": pdfHash } });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
 
@@ -340,7 +401,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const mapped = geminiHttpErrorResponse(err, MODEL);
+    const mapped = geminiHttpErrorResponse(err, MODEL_PRO);
     return NextResponse.json(mapped.body, { status: mapped.status });
   } finally {
     if (cleanup) {
