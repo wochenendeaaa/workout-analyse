@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon Expense Tracker</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__inner">
+      <div>
+        <h1 class="header__title">Neon Expense Tracker</h1>
+        <p class="header__sub">Local-first · data never leaves your browser</p>
+      </div>
+      <div class="header__actions" id="header-actions" hidden>
+        <button class="btn btn--outline btn--sm" id="export-json-btn">Export JSON</button>
+        <button class="btn btn--outline btn--sm" id="export-csv-btn">Export CSV</button>
+        <button class="btn btn--ghost btn--sm" id="clear-btn">Clear all data</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ── Drop zone ─────────────────────────────────────────────────────── -->
+    <div id="drop-zone" class="drop-zone">
+      <div class="drop-zone__content">
+        <div class="drop-zone__icon">📂</div>
+        <p class="drop-zone__text">Drop Neon CSV files here</p>
+        <p class="drop-zone__sub">or <label class="link" for="file-input">browse files</label></p>
+        <input type="file" id="file-input" accept=".csv" multiple class="sr-only">
+        <p class="drop-zone__hint">Files are processed in your browser — nothing is uploaded anywhere.</p>
+      </div>
+    </div>
+
+    <!-- ── Import feedback ────────────────────────────────────────────────── -->
+    <div id="import-banner" class="banner hidden" role="status" aria-live="polite"></div>
+
+    <!-- ── Dashboard (shown after first import) ──────────────────────────── -->
+    <div id="dashboard" hidden>
+
+      <!-- Controls -->
+      <div class="controls-row">
+        <label class="month-label">
+          <span>Month</span>
+          <select id="month-select" class="select"></select>
+        </label>
+        <span class="controls-row__spacer"></span>
+        <span id="total-count" class="count-note"></span>
+      </div>
+
+      <!-- Exclusion banners -->
+      <div id="cc-banner"     class="banner hidden"></div>
+      <div id="spaces-banner" class="banner hidden"></div>
+
+      <!-- Stats -->
+      <section class="stats-grid" aria-label="Monthly summary">
+        <div class="stat-card stat-card--income">
+          <span class="stat__label">Income</span>
+          <span class="stat__value" id="stat-income">—</span>
+        </div>
+        <div class="stat-card stat-card--spending">
+          <span class="stat__label">Spending</span>
+          <span class="stat__value" id="stat-spending">—</span>
+        </div>
+        <div class="stat-card" id="stat-card-net">
+          <span class="stat__label">Net</span>
+          <span class="stat__value" id="stat-net">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat__label">Transactions</span>
+          <span class="stat__value" id="stat-count">—</span>
+        </div>
+      </section>
+
+      <!-- Charts -->
+      <section class="charts-grid">
+        <div class="card">
+          <h2 class="card__title">Spending by Category</h2>
+          <div class="chart-wrap">
+            <canvas id="category-chart"></canvas>
+            <p id="category-chart-empty" class="empty" hidden>No spending data for this month.</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2 class="card__title">Top Merchants</h2>
+          <div class="chart-wrap">
+            <canvas id="merchant-chart"></canvas>
+            <p id="merchant-chart-empty" class="empty" hidden>No spending data for this month.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Subscriptions -->
+      <section class="card" id="subs-section" style="scroll-margin-top: 80px">
+        <h2 class="card__title">
+          Subscriptions
+          <span id="subs-badge" class="badge" hidden>0</span>
+        </h2>
+        <div id="subs-content"></div>
+      </section>
+
+      <!-- Uncategorized -->
+      <section class="card" id="uncat-section" style="scroll-margin-top: 80px">
+        <h2 class="card__title">
+          Uncategorized
+          <span id="uncat-badge" class="badge badge--warn">0</span>
+        </h2>
+        <div id="uncat-content"></div>
+      </section>
+
+      <!-- Spaces transfers -->
+      <section class="card" id="spaces-section" hidden style="scroll-margin-top: 80px">
+        <h2 class="card__title">
+          Spaces Transfers
+          <span id="spaces-badge" class="badge badge--neutral">0</span>
+        </h2>
+        <p class="card__desc">Internal movements between your Neon sub-accounts. Excluded from all totals.</p>
+        <div id="spaces-content"></div>
+      </section>
+
+      <!-- Credit card payments -->
+      <section class="card" id="cc-section" hidden style="scroll-margin-top: 80px">
+        <h2 class="card__title">
+          Credit Card Payments
+          <span id="cc-badge" class="badge badge--warn">0</span>
+        </h2>
+        <p class="card__desc">These lump-sum payments are excluded from category totals — the underlying spending is tracked on your credit card statement, not here. Auto-detected from description. Use "Remove tag" if mis-classified.</p>
+        <div id="cc-content"></div>
+      </section>
+
+    </div><!-- /dashboard -->
+  </main>
+
+  <!-- Vendor libraries loaded as classic scripts so they register globals
+       (Papa, Chart) before our ES module runs. -->
+  <script src="vendor/papaparse.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
